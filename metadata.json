@@ -1,0 +1,8 @@
+{
+  "name": "Lover's Secret - 私密情侣空间",
+  "description": "A private, secure, and beautiful PWA designed exclusively for couples with iOS-style UI, featuring encrypted chat, anniversary reminders, and a private moment feed.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
