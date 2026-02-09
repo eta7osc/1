@@ -1,250 +1,258 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Send, Image as ImageIcon, Video, Smile, Flame, CheckCheck } from 'lucide-react';
-import { Message, MessageType } from '../types';
-// 引入 MemFire 客户端 (请确保 services/memfire.ts 文件已创建)
-import { supabase } from '../services/memfire'; 
-
-// 模拟身份系统：检查本地存储，如果没有则默认为 'boy'
-// 生产环境技巧：你可以在女友手机浏览器控制台输入 localStorage.setItem('userId', 'girl')
-const CURRENT_USER_ID = localStorage.getItem('userId') || 'boy';
+// pages/ChatPage.tsx
+import React, { useEffect, useRef, useState } from 'react'
+import {
+  fetchMessages,
+  sendFileMessage,
+  sendTextMessage,
+  Message,
+  Sender
+} from '../services/chatService'
 
 const ChatPage: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [inputText, setInputText] = useState('');
-  const [isBurning, setIsBurning] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [messages, setMessages] = useState<Message[]>([])
+  const [input, setInput] = useState('')
+  const [senderId, setSenderId] = useState<Sender>('me')
+  const [loading, setLoading] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
-  // ----------------------------------------------------
-  // 核心修改 1: 初始化与实时订阅 (替换原来的 storage.get)
-  // ----------------------------------------------------
-  useEffect(() => {
-    // 1. 先加载历史记录
-    fetchHistory();
-    
-    // 2. 开启实时监听 (当数据库有新消息，立刻推送到前端)
-    const channel = supabase
-      .channel('chat-room')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
-        (payload) => {
-          // 收到新消息 -> 转换格式 -> 追加到列表
-          const newMsg = formatMessageFromDB(payload.new);
-          setMessages((prev) => [...prev, newMsg]);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  // 自动滚动到底部
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  const scrollToBottom = () => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [messages]);
+  }
 
-  // 阅后即焚倒计时逻辑 (保持不变，只做本地视觉过滤)
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const now = Date.now();
-      setMessages(prev => {
-        // 过滤掉：设定了销毁时间 且 时间已到 的消息
-        const filtered = prev.filter(m => !m.destructAt || m.destructAt > now);
-        // 为了性能，只有当长度变化时才更新状态
-        if (filtered.length !== prev.length) {
-          return filtered;
-        }
-        return prev;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // ----------------------------------------------------
-  // 辅助函数: 数据库格式 -> 前端格式转换器
-  // ----------------------------------------------------
-  const formatMessageFromDB = (dbRecord: any): Message => {
-    return {
-      id: dbRecord.id,
-      // 关键逻辑：如果数据库里的 sender_id 等于当前用户的 ID，就是 'me'，否则是 'partner'
-      senderId: dbRecord.sender_id === CURRENT_USER_ID ? 'me' : 'partner', 
-      content: dbRecord.content,
-      type: dbRecord.type as MessageType,
-      timestamp: new Date(dbRecord.created_at).getTime(),
-      isRead: dbRecord.is_read,
-      selfDestruct: dbRecord.self_destruct,
-      destructAt: dbRecord.destruct_at ? Number(dbRecord.destruct_at) : undefined
-    };
-  };
-
-  const fetchHistory = async () => {
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .order('created_at', { ascending: true }); // 按时间顺序排列
-    
-    if (data) {
-      setMessages(data.map(formatMessageFromDB));
+  const loadMessages = async () => {
+    setLoading(true)
+    try {
+      const data = await fetchMessages()
+      setMessages(data)
+      setTimeout(scrollToBottom, 100)
+    } finally {
+      setLoading(false)
     }
-  };
+  }
 
-  // ----------------------------------------------------
-  // 核心修改 2: 发送消息逻辑 (替换 setMessages 为 supabase.insert)
-  // ----------------------------------------------------
   const handleSend = async () => {
-    if (!inputText.trim()) return;
-    
-    const textToSend = inputText;
-    setInputText(''); // 立即清空输入框，提升体验
+    if (!input.trim()) return
+    await sendTextMessage(senderId, input)
+    setInput('')
+    await loadMessages()
+  }
 
-    // 构造写入数据库的数据对象
-    const messageData = {
-      content: textToSend,
-      sender_id: CURRENT_USER_ID,
-      type: MessageType.TEXT,
-      self_destruct: isBurning,
-      // 如果开启阅后即焚，写入当前时间 + 5分钟
-      destruct_at: isBurning ? Date.now() + 5 * 60 * 1000 : null
-    };
-
-    // 发送到 MemFire
-    const { error } = await supabase.from('messages').insert(messageData);
-
-    if (error) {
-      console.error('发送失败:', error);
-      alert('发送失败，请重试');
-      setInputText(textToSend); // 失败则恢复文字
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleSend()
     }
-  };
+  }
 
-  // 图片/视频 上传逻辑
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: MessageType) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    await sendFileMessage(senderId, file)
+    e.target.value = ''
+    await loadMessages()
+  }
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const content = event.target?.result as string;
-      
-      const messageData = {
-        content: content, // 这里直接存 Base64，简单粗暴
-        sender_id: CURRENT_USER_ID,
-        type: type,
-        self_destruct: isBurning,
-        destruct_at: isBurning ? Date.now() + 5 * 60 * 1000 : null
-      };
+  useEffect(() => {
+    loadMessages()
+    const timer = setInterval(loadMessages, 3000)
+    return () => clearInterval(timer)
+  }, [])
 
-      await supabase.from('messages').insert(messageData);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // ----------------------------------------------------
-  // UI 渲染部分 (保持你原有的样式完全不变)
-  // ----------------------------------------------------
   return (
-    <div className="flex flex-col h-full bg-[#F2F2F7]">
-      {/* Messages Area */}
-      <div 
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar pb-24"
-      >
-        <div className="text-center text-xs text-gray-400 my-4">加密连接已建立</div>
-        
-        {messages.map((msg) => (
-          <div 
-            key={msg.id} 
-            className={`flex flex-col ${msg.senderId === 'me' ? 'items-end' : 'items-start'}`}
+    <div style={styles.page}>
+      <div style={styles.header}>
+        <span>Lover&apos;s Secret</span>
+        <select
+          value={senderId}
+          onChange={e => setSenderId(e.target.value as Sender)}
+          style={styles.select}
+        >
+          <option value="me">我</option>
+          <option value="her">她</option>
+        </select>
+      </div>
+
+      <div style={styles.messages}>
+        {loading && messages.length === 0 && (
+          <div style={styles.system}>正在加载聊天记录...</div>
+        )}
+
+        {messages.map(m => (
+          <div
+            key={m._id}
+            style={{
+              ...styles.msgRow,
+              justifyContent: m.senderId === 'me' ? 'flex-end' : 'flex-start'
+            }}
           >
-            <div className={`flex items-end gap-1 ${msg.senderId === 'me' ? 'flex-row-reverse' : 'flex-row'}`}>
-              <div 
-                className={`max-w-[75%] p-3 rounded-2xl text-sm shadow-sm 
-                  ${msg.senderId === 'me' 
-                    ? 'bg-pink-500 text-white rounded-br-none' 
-                    : 'bg-white text-black rounded-bl-none'
-                }`}
-              >
-                {msg.type === MessageType.TEXT && msg.content}
-                {msg.type === MessageType.IMAGE && (
-                  <img src={msg.content} alt="Upload" className="rounded-lg max-h-60 object-cover" />
-                )}
-                {msg.type === MessageType.VIDEO && (
-                  <video src={msg.content} controls className="rounded-lg max-h-60" />
-                )}
-                
-                {msg.selfDestruct && (
-                  <div className="mt-2 pt-2 border-t border-white/20 flex items-center gap-1 text-[10px] opacity-80">
-                    <Flame size={12} />
-                    <span>{msg.destructAt ?
-                      Math.max(0, Math.ceil((msg.destructAt - Date.now()) / 1000 / 60)) : 5}分钟后销毁</span>
-                  </div>
-                )}
-              </div>
-              
-              {msg.senderId === 'me' && (
-                <div className="mb-1">
-                  {/* 注意：为了简化，这里只要发出去就显示蓝色对勾，不真正判断对方是否已读 */}
-                  <CheckCheck size={14} className={'text-blue-500'} />
-                </div>
+            <div
+              style={{
+                ...styles.msgBubble,
+                backgroundColor: m.senderId === 'me' ? '#ff5a79' : '#3a3a3a'
+              }}
+            >
+              {m.type === 'text' && <div>{m.content}</div>}
+
+              {m.type === 'image' && m.url && (
+                <img
+                  src={m.url}
+                  alt="img"
+                  style={{ maxWidth: 220, borderRadius: 8 }}
+                />
               )}
+
+              {m.type === 'video' && m.url && (
+                <video
+                  src={m.url}
+                  controls
+                  style={{ maxWidth: 260, borderRadius: 8 }}
+                />
+              )}
+
+              <div style={styles.time}>
+                {m.createdAt
+                  ? new Date(m.createdAt).toLocaleString()
+                  : ''}
+              </div>
             </div>
           </div>
         ))}
+
+        <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="fixed bottom-[84px] left-0 right-0 ios-blur border-t p-3 safe-pb">
-        <div className="flex items-center gap-2 mb-2">
-            <button 
-                onClick={() => setIsBurning(!isBurning)}
-                className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs transition-all ${
-                  isBurning ? 'bg-orange-500 text-white shadow-inner' : 'bg-gray-100 text-gray-500'
-                }`}
-            >
-                <Flame size={14} />
-                阅后五分钟即焚
-            </button>
-        </div>
-         
-        <div className="flex items-end gap-2">
-          <div className="flex gap-2 mb-1">
-            <label className="cursor-pointer text-gray-400 active:text-pink-500 transition-colors">
-                <ImageIcon size={24} />
-                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, MessageType.IMAGE)} />
-            </label>
-            <label className="cursor-pointer text-gray-400 active:text-pink-500 transition-colors">
-                <Video size={24} />
-                <input type="file" accept="video/*" className="hidden" onChange={(e) => handleFileUpload(e, MessageType.VIDEO)} />
-            </label>
-          </div>
-          
-          <div className="flex-1 bg-white border rounded-2xl min-h-[38px] flex items-center px-3 py-1">
-            <textarea 
-              rows={1}
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="发送消息..."
-              className="flex-1 outline-none text-sm resize-none bg-transparent"
-              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSend())}
-            />
-            <Smile size={20} className="text-gray-400 ml-2" />
-          </div>
+      <div style={styles.inputBar}>
+        <input
+          type="file"
+          accept="image/*,video/*"
+          onChange={handleFileChange}
+          style={styles.fileInput}
+        />
 
-          <button 
-            onClick={handleSend}
-            disabled={!inputText.trim()}
-            className="w-10 h-10 bg-pink-500 rounded-full flex items-center justify-center text-white disabled:bg-gray-300 shadow-md active:scale-95 transition-all"
-          >
-            <Send size={18} />
-          </button>
-        </div>
+        <input
+          style={styles.textInput}
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="说点什么..."
+        />
+
+        <button style={styles.sendBtn} onClick={handleSend}>
+          发送
+        </button>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default ChatPage;
+// 底部导航栏的高度（你那排“聊天/纪念日/朋友圈/相册/设置”大概有多高）
+// 不够可以之后调成 70、80
+const NAV_HEIGHT = 60  // 底部导航大概高度，之后可以微调
+
+const styles: { [k: string]: React.CSSProperties } = {
+  page: {
+    position: 'relative',
+    minHeight: '100vh',
+    // 为“聊天输入栏 + 底部导航栏”预留空间，避免聊天内容被压住
+    paddingBottom: NAV_HEIGHT + 56,
+    background: '#f5f5f7',
+    color: '#333',
+    fontFamily: 'system-ui,-apple-system,BlinkMacSystemFont',
+    boxSizing: 'border-box'
+  },
+  header: {
+    padding: '8px 12px',
+    borderBottom: '1px solid #e5e5e5',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    background: '#ffffff'
+  },
+  select: {
+    background: '#f5f5f7',
+    color: '#333',
+    borderRadius: 16,
+    border: '1px solid #dddddd',
+    padding: '4px 10px',
+    fontSize: 12
+  },
+  messages: {
+    padding: '10px 12px',
+    background: '#f5f5f7',
+    overflowY: 'auto',
+    // 聊天内容区域高度 = 屏幕高度 - 导航栏高度 - 输入栏高度（约 56px）
+    maxHeight: `calc(100vh - ${NAV_HEIGHT + 56}px)`
+  },
+  msgRow: {
+    display: 'flex',
+    marginBottom: 8
+  },
+  msgBubble: {
+    maxWidth: '70%',
+    padding: '8px 10px',
+    borderRadius: 16,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+    backgroundColor: '#ffffff',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
+  },
+  time: {
+    fontSize: 10,
+    opacity: 0.6,
+    marginTop: 4,
+    alignSelf: 'flex-end'
+  },
+  system: {
+    textAlign: 'center',
+    color: '#999',
+    fontSize: 12,
+    marginTop: 12
+  },
+  inputBar: {
+    // 关键：固定在视口底部，而不是跟着内容流动
+    position: 'fixed',
+    left: 0,
+    right: 0,
+    // 放在“底部导航栏上面”
+    bottom: NAV_HEIGHT,
+    padding: '8px 10px',
+    borderTop: '1px solid #e5e5e5',
+    display: 'flex',
+    gap: 6,
+    alignItems: 'center',
+    background: '#ffffff',
+    zIndex: 10,        // 保证不被其他元素盖住
+    boxSizing: 'border-box'
+  },
+  fileInput: {
+    flexShrink: 0
+  },
+  textInput: {
+    flex: 1,
+    padding: '8px 12px',
+    borderRadius: 20,
+    border: '1px solid #dddddd',
+    outline: 'none',
+    background: '#f5f5f7',
+    color: '#333',
+    fontSize: 14
+  },
+  sendBtn: {
+    padding: '8px 16px',
+    borderRadius: 20,
+    border: 'none',
+    background: '#ff7aa5',
+    color: '#fff',
+    fontSize: 14,
+    cursor: 'pointer',
+    boxShadow: '0 2px 6px rgba(255,122,165,0.4)',
+    whiteSpace: 'nowrap'
+  }
+}
+
+
+
+export default ChatPage
