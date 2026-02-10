@@ -492,7 +492,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
           const leftSeconds = remainingSeconds(message, nowMs)
 
           return (
-            <div key={message._id} className={`w-full flex items-end gap-2 ${isMine ? 'justify-end flex-row-reverse' : 'justify-start'}`}>
+            <div key={message._id} className={`w-full flex items-end gap-2 ${isMine ? 'justify-start flex-row-reverse' : 'justify-start'}`}>
               <div className="h-9 w-9 rounded-full overflow-hidden bg-rose-100 text-rose-400 border border-rose-200/80 shrink-0 flex items-center justify-center">
                 {avatarUrl ? <img src={avatarUrl} alt="chat-avatar" className="h-full w-full object-cover" /> : <UserCircle2 size={20} />}
               </div>

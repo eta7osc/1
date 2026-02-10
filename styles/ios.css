@@ -23,7 +23,9 @@ html,
 body,
 #root {
   margin: 0;
+  height: 100%;
   min-height: 100%;
+  min-height: 100dvh;
   width: 100%;
   background:
     radial-gradient(circle at 14% 2%, rgba(255, 182, 193, 0.4) 0%, rgba(255, 182, 193, 0) 32%),

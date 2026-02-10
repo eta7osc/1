@@ -68,12 +68,14 @@ const PasscodeLock: React.FC<PasscodeLockProps> = ({ onSuccess }) => {
       style={{
         background:
           'radial-gradient(circle at 14% 16%, rgba(255, 185, 200, 0.45) 0%, rgba(255, 185, 200, 0) 34%), radial-gradient(circle at 90% 4%, rgba(255, 227, 186, 0.48) 0%, rgba(255, 227, 186, 0) 30%), linear-gradient(180deg, #fff9fb 0%, #fff2f7 62%, #ffeef5 100%)',
+        height: '100dvh',
         minHeight: '100dvh'
       }}
     >
       <div
-        className="w-full h-full max-w-[460px] flex flex-col items-center text-center px-6"
+        className="w-full max-w-[460px] flex flex-col items-center text-center px-6 overflow-hidden"
         style={{
+          height: '100%',
           paddingTop: 'calc(env(safe-area-inset-top) + 14px)',
           paddingBottom: 'calc(env(safe-area-inset-bottom) + 10px)'
         }}
@@ -106,7 +108,7 @@ const PasscodeLock: React.FC<PasscodeLockProps> = ({ onSuccess }) => {
           </div>
         </div>
 
-        <div className="w-full max-w-xs mx-auto shrink-0">
+        <div className="w-full max-w-xs mx-auto shrink-0 pb-1">
           <div className="grid grid-cols-3 gap-4 w-full">
             {keys.map(key => (
               <button
@@ -136,7 +138,7 @@ const PasscodeLock: React.FC<PasscodeLockProps> = ({ onSuccess }) => {
           </div>
         </div>
 
-        <div className="mt-3">
+        <div className="mt-3 shrink-0">
           <button
             type="button"
             className="text-rose-500 font-medium text-sm"
