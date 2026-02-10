@@ -10,7 +10,10 @@ const AnniversaryPage = lazy(() => import('./pages/AnniversaryPage'))
 const HomePage = lazy(() => import('./pages/HomePage'))
 const PhotoWallPage = lazy(() => import('./pages/PhotoWallPage'))
 
-const AccountBindPage: React.FC<{ onBound: (profile: AccountProfile) => void }> = ({ onBound }) => {
+const AccountBindPage: React.FC<{ onBound: (profile: AccountProfile) => void; startupError?: string }> = ({
+  onBound,
+  startupError
+}) => {
   const [role, setRole] = useState<Sender>('me')
   const [inviteCode, setInviteCode] = useState('')
   const [binding, setBinding] = useState(false)
@@ -46,6 +49,8 @@ const AccountBindPage: React.FC<{ onBound: (profile: AccountProfile) => void }> 
             <p className="text-xs text-gray-500">仅允许两位使用，身份绑定后自动同步</p>
           </div>
         </div>
+
+        {startupError && <div className="text-sm text-red-500">{startupError}</div>}
 
         <div className="ios-segment w-full">
           <button type="button" onClick={() => setRole('me')} className={role === 'me' ? 'is-active flex-1' : 'flex-1'}>
@@ -148,6 +153,7 @@ const AppContent: React.FC = () => {
   const [isLocked, setIsLocked] = useState(true)
   const [accountLoading, setAccountLoading] = useState(false)
   const [account, setAccount] = useState<AccountProfile | null>(null)
+  const [startupError, setStartupError] = useState('')
 
   useEffect(() => {
     if (isLocked) {
@@ -156,11 +162,18 @@ const AppContent: React.FC = () => {
 
     let active = true
     setAccountLoading(true)
+    setStartupError('')
 
     getBoundAccount()
       .then(profile => {
         if (active) {
           setAccount(profile)
+        }
+      })
+      .catch(err => {
+        if (active) {
+          setStartupError(err instanceof Error ? err.message : '初始化失败')
+          setAccount(null)
         }
       })
       .finally(() => {
@@ -199,7 +212,7 @@ const AppContent: React.FC = () => {
   }
 
   if (!account) {
-    return <AccountBindPage onBound={setAccount} />
+    return <AccountBindPage onBound={setAccount} startupError={startupError} />
   }
 
   return (
