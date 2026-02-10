@@ -2,7 +2,7 @@
 import { HashRouter as Router, Navigate, NavLink, Route, Routes } from 'react-router-dom'
 import { CalendarClock, Camera, House, MessageCircle, Settings, ShieldCheck } from 'lucide-react'
 import PasscodeLock from './components/PasscodeLock'
-import { AccountProfile, bindAccount, clearCachedProfile, getBoundAccount } from './services/accountService'
+import { AccountProfile, bindAccount, getBoundAccount, unbindCurrentAccount } from './services/accountService'
 import type { Sender } from './services/chatService'
 
 const ChatPage = lazy(() => import('./pages/ChatPage'))
@@ -81,31 +81,54 @@ const AccountBindPage: React.FC<{ onBound: (profile: AccountProfile) => void; st
   )
 }
 
-const SettingsPage: React.FC<{ account: AccountProfile; onRebind: () => void }> = ({ account, onRebind }) => (
-  <div className="ios-page px-4 pb-32 ios-safe-top ios-scroll">
-    <div className="ios-card p-5 space-y-5">
-      <div>
-        <h2 className="ios-title text-2xl">设置</h2>
-        <p className="text-sm ios-soft-text mt-1">管理身份、安全和双人空间</p>
-      </div>
+const SettingsPage: React.FC<{ account: AccountProfile; onRebind: () => Promise<void> }> = ({ account, onRebind }) => {
+  const [rebinding, setRebinding] = useState(false)
+  const [error, setError] = useState('')
 
-      <div className="ios-card-flat overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-          <span>当前账号</span>
-          <span className="ios-chip ios-chip-info">{account.nickname}</span>
+  const handleRebind = async () => {
+    try {
+      setRebinding(true)
+      setError('')
+      await onRebind()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '解绑失败，请稍后重试')
+      setRebinding(false)
+    }
+  }
+
+  return (
+    <div className="ios-page px-4 pb-32 ios-safe-top ios-scroll">
+      <div className="ios-card p-5 space-y-5">
+        <div>
+          <h2 className="ios-title text-2xl">设置</h2>
+          <p className="text-sm ios-soft-text mt-1">管理身份、安全和双人空间</p>
         </div>
-        <div className="px-4 py-3 border-b border-gray-100/80 flex items-center justify-between">
-          <span>双人绑定状态</span>
-          <span className="text-green-600 text-sm font-semibold">正常</span>
+
+        <div className="ios-card-flat overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <span>当前账号</span>
+            <span className="ios-chip ios-chip-info">{account.nickname}</span>
+          </div>
+          <div className="px-4 py-3 border-b border-gray-100/80 flex items-center justify-between">
+            <span>双人绑定状态</span>
+            <span className="text-green-600 text-sm font-semibold">正常</span>
+          </div>
+          <button
+            type="button"
+            className="w-full px-4 py-3 text-left flex items-center justify-between disabled:opacity-60"
+            onClick={handleRebind}
+            disabled={rebinding}
+          >
+            <span>切换/重绑账号</span>
+            <span className="text-rose-500 text-sm font-semibold">{rebinding ? '解绑中...' : '重新绑定'}</span>
+          </button>
         </div>
-        <button type="button" className="w-full px-4 py-3 text-left flex items-center justify-between" onClick={onRebind}>
-          <span>切换/重绑账号</span>
-          <span className="text-rose-500 text-sm font-semibold">重新绑定</span>
-        </button>
+
+        {error && <div className="text-sm text-red-500">{error}</div>}
       </div>
     </div>
-  </div>
-)
+  )
+}
 
 const TabBar: React.FC = () => (
   <nav className="ios-tabbar ios-blur ios-safe-bottom">
@@ -195,8 +218,8 @@ const AppContent: React.FC = () => {
     return (
       <SettingsPage
         account={account}
-        onRebind={() => {
-          clearCachedProfile()
+        onRebind={async () => {
+          await unbindCurrentAccount()
           setAccount(null)
         }}
       />

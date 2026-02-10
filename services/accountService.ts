@@ -43,6 +43,24 @@ export function clearCachedProfile() {
   localStorage.removeItem(ACCOUNT_STORAGE_KEY)
 }
 
+export async function unbindCurrentAccount(): Promise<void> {
+  await ensureLogin()
+  const uid = await getCurrentUid()
+  if (!uid) {
+    throw new Error('账号初始化失败，请刷新页面重试')
+  }
+
+  const db = app.database()
+  const currentQuery = await db.collection(ACCOUNT_COLLECTION).where({ uid }).limit(1).get()
+  const currentRow = currentQuery.data?.[0] as any
+
+  if (currentRow?._id) {
+    await db.collection(ACCOUNT_COLLECTION).doc(currentRow._id).remove()
+  }
+
+  clearCachedProfile()
+}
+
 export async function getBoundAccount(): Promise<AccountProfile | null> {
   await ensureLogin()
   const uid = await getCurrentUid()
