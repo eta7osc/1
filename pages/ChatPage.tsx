@@ -1,21 +1,65 @@
-﻿import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { fetchMessages, Message, sendFileMessage, sendTextMessage, Sender } from '../services/chatService'
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Clock3, ImagePlus, Lock, Send, SmilePlus, Sticker } from 'lucide-react'
+import {
+  EmojiPackItem,
+  fetchEmojiPacks,
+  fetchMessages,
+  markPrivateMessageViewed,
+  Message,
+  saveEmojiPackFromMessage,
+  sendEmojiMessage,
+  sendFileMessage,
+  sendTextMessage,
+  Sender,
+  uploadEmojiPack
+} from '../services/chatService'
 
-const NAV_HEIGHT = 60
-const INPUT_BAR_HEIGHT = 56
 const POLL_INTERVAL_MS = 5000
+const DESTRUCT_OPTIONS = [
+  { label: '关闭', value: 0 },
+  { label: '30 秒', value: 30 },
+  { label: '5 分钟', value: 300 },
+  { label: '1 小时', value: 3600 },
+  { label: '1 天', value: 86400 }
+]
 
-const ChatPage: React.FC = () => {
+interface ChatPageProps {
+  currentSender: Sender
+  currentUserLabel: string
+}
+
+function isMessageDestroyed(message: Message, nowMs: number) {
+  if (!message.destructAt) {
+    return false
+  }
+  return new Date(message.destructAt).getTime() <= nowMs
+}
+
+function remainingSeconds(message: Message, nowMs: number) {
+  if (!message.destructAt) {
+    return 0
+  }
+  return Math.max(0, Math.ceil((new Date(message.destructAt).getTime() - nowMs) / 1000))
+}
+
+const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) => {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
-  const [senderId, setSenderId] = useState<Sender>('me')
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
+  const [privateMode, setPrivateMode] = useState(false)
+  const [destructSeconds, setDestructSeconds] = useState(300)
+  const [showEmojiPanel, setShowEmojiPanel] = useState(false)
+  const [emojiPacks, setEmojiPacks] = useState<EmojiPackItem[]>([])
+  const [emojiLoading, setEmojiLoading] = useState(false)
+  const [nowMs, setNowMs] = useState(Date.now())
 
   const isLoadingRef = useRef(false)
   const pollTimerRef = useRef<number | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const mediaInputRef = useRef<HTMLInputElement | null>(null)
+  const emojiUploadRef = useRef<HTMLInputElement | null>(null)
 
   const scrollToBottom = useCallback(() => {
     if (messagesEndRef.current) {
@@ -48,6 +92,19 @@ const ChatPage: React.FC = () => {
     }
   }, [])
 
+  const loadEmojiPacks = useCallback(async () => {
+    try {
+      setEmojiLoading(true)
+      const data = await fetchEmojiPacks()
+      setEmojiPacks(data)
+    } catch (err) {
+      console.error('[Chat] load emoji packs failed', err)
+      setError('表情包加载失败')
+    } finally {
+      setEmojiLoading(false)
+    }
+  }, [])
+
   const startPolling = useCallback(() => {
     if (pollTimerRef.current) {
       window.clearInterval(pollTimerRef.current)
@@ -67,7 +124,7 @@ const ChatPage: React.FC = () => {
     }
   }, [])
 
-  const handleSend = useCallback(async () => {
+  const handleSendText = useCallback(async () => {
     const text = input.trim()
     if (!text || sending) {
       return
@@ -81,7 +138,7 @@ const ChatPage: React.FC = () => {
     const tempMsg: Message = {
       _id: tempId,
       roomId: 'couple-room',
-      senderId,
+      senderId: currentSender,
       type: 'text',
       content: text,
       createdAt: new Date().toISOString()
@@ -90,7 +147,7 @@ const ChatPage: React.FC = () => {
     setMessages(prev => [...prev, tempMsg])
 
     try {
-      await sendTextMessage(senderId, text)
+      await sendTextMessage(currentSender, text)
       await loadMessages(false)
     } catch (err) {
       console.error('[Chat] send text failed', err)
@@ -100,45 +157,113 @@ const ChatPage: React.FC = () => {
     } finally {
       setSending(false)
     }
-  }, [input, loadMessages, senderId, sending])
+  }, [input, sending, currentSender, loadMessages])
 
-  const handleFileChange = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]
-      e.target.value = ''
-
-      if (!file || sending) {
-        return
-      }
-
+  const handleSendMedia = useCallback(
+    async (file: File) => {
       setSending(true)
       setError('')
 
+      const isVideo = file.type.startsWith('video/')
       const tempId = `local-file-${Date.now()}`
       const tempMsg: Message = {
         _id: tempId,
         roomId: 'couple-room',
-        senderId,
-        type: file.type.startsWith('video') ? 'video' : 'image',
+        senderId: currentSender,
+        type: isVideo ? 'video' : 'image',
         content: '',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        privateMedia: privateMode,
+        selfDestructSeconds: privateMode ? destructSeconds : undefined
       }
 
       setMessages(prev => [...prev, tempMsg])
 
       try {
-        await sendFileMessage(senderId, file)
+        await sendFileMessage(currentSender, file, {
+          privateMedia: privateMode,
+          selfDestructSeconds: privateMode ? destructSeconds : undefined
+        })
         await loadMessages(false)
       } catch (err) {
-        console.error('[Chat] send file failed', err)
+        console.error('[Chat] send media failed', err)
         setMessages(prev => prev.filter(message => message._id !== tempId))
-        setError(err instanceof Error ? err.message : '附件发送失败，请稍后重试')
+        setError(err instanceof Error ? err.message : '媒体发送失败')
       } finally {
         setSending(false)
       }
     },
-    [loadMessages, senderId, sending]
+    [currentSender, destructSeconds, loadMessages, privateMode]
   )
+
+  const handleMediaInput = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      e.target.value = ''
+      if (!file || sending) {
+        return
+      }
+      await handleSendMedia(file)
+    },
+    [handleSendMedia, sending]
+  )
+
+  const handleEmojiUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+
+    if (!file || sending) {
+      return
+    }
+
+    try {
+      setSending(true)
+      await uploadEmojiPack(currentSender, file)
+      await loadEmojiPacks()
+      setShowEmojiPanel(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '上传表情包失败')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const handleSendEmoji = async (fileId: string) => {
+    try {
+      setSending(true)
+      await sendEmojiMessage(currentSender, fileId)
+      await loadMessages(false)
+      setShowEmojiPanel(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '发送表情包失败')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const handleSaveEmojiFromMessage = async (message: Message) => {
+    if (!message.fileId) {
+      return
+    }
+
+    try {
+      setError('')
+      await saveEmojiPackFromMessage(currentSender, message.fileId)
+      await loadEmojiPacks()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '保存表情包失败')
+    }
+  }
+
+  const handleViewPrivateMessage = async (message: Message) => {
+    try {
+      await markPrivateMessageViewed(message)
+      await loadMessages(false)
+    } catch (err) {
+      console.error('[Chat] mark viewed failed', err)
+      setError('开启私密内容失败，请重试')
+    }
+  }
 
   useEffect(() => {
     loadMessages(true)
@@ -162,209 +287,217 @@ const ChatPage: React.FC = () => {
   }, [loadMessages, startPolling, stopPolling])
 
   useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    if (showEmojiPanel) {
+      loadEmojiPacks()
+    }
+  }, [showEmojiPanel, loadEmojiPacks])
+
+  useEffect(() => {
     scrollToBottom()
   }, [messages, scrollToBottom])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      handleSend()
+      handleSendText()
     }
   }
 
+  const activeMessages = useMemo(() => messages.filter(message => !isMessageDestroyed(message, nowMs)), [messages, nowMs])
+
   return (
-    <div style={styles.page}>
-      <div style={styles.header}>
-        <span>Lover&apos;s Secret</span>
-        <select
-          value={senderId}
-          onChange={e => setSenderId(e.target.value as Sender)}
-          style={styles.select}
-          disabled={sending}
-        >
-          <option value="me">我</option>
-          <option value="her">她</option>
-        </select>
-      </div>
-
-      <div style={styles.messages}>
-        {loading && messages.length === 0 && <div style={styles.system}>正在加载聊天记录...</div>}
-        {!loading && messages.length === 0 && <div style={styles.system}>还没有消息，发一条试试</div>}
-
-        {messages.map(message => (
-          <div
-            key={message._id}
-            style={{
-              ...styles.msgRow,
-              justifyContent: message.senderId === 'me' ? 'flex-end' : 'flex-start'
-            }}
-          >
-            <div
-              style={{
-                ...styles.msgBubble,
-                backgroundColor: message.senderId === 'me' ? '#ff5a79' : '#3a3a3a'
-              }}
-            >
-              {message.type === 'text' && <div>{message.content}</div>}
-              {message.type === 'image' && message.url && <img src={message.url} alt="image" style={styles.image} />}
-              {message.type === 'video' && message.url && <video src={message.url} controls style={styles.video} />}
-              {(message.type === 'image' || message.type === 'video') && !message.url && (
-                <div style={styles.pendingFile}>上传中...</div>
-              )}
-
-              <div style={styles.time}>{message.createdAt ? new Date(message.createdAt).toLocaleString() : ''}</div>
-            </div>
+    <div className="ios-page h-full flex flex-col">
+      <header className="ios-blur ios-safe-top px-4 pb-3 border-b border-gray-200/70">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="ios-title text-xl">Lover&apos;s Secret</h1>
+            <p className="text-xs text-gray-500 mt-0.5">当前账号：{currentUserLabel}</p>
           </div>
-        ))}
+          <span className="ios-chip ios-chip-pink">私密聊天</span>
+        </div>
+      </header>
 
-        {error && <div style={styles.error}>{error}</div>}
+      <main className="flex-1 ios-scroll px-3 py-3 space-y-2 bg-[linear-gradient(180deg,#f7f8fc_0%,#eef2fb_100%)]">
+        {loading && activeMessages.length === 0 && <div className="text-center text-xs text-gray-400">正在加载聊天记录...</div>}
+        {!loading && activeMessages.length === 0 && <div className="text-center text-xs text-gray-400">还没有消息，发一条试试</div>}
+
+        {activeMessages.map(message => {
+          const isMine = message.senderId === 'me'
+          const isPrivate = Boolean(message.privateMedia && (message.type === 'image' || message.type === 'video'))
+          const isLocked = isPrivate && message.senderId !== currentSender && !message.viewedAt
+          const leftSeconds = remainingSeconds(message, nowMs)
+
+          return (
+            <div key={message._id} className={`w-full flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[78%] relative ${isMine ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
+                <div
+                  className={`rounded-2xl px-3 py-2 shadow-sm border ${
+                    isMine
+                      ? 'bg-[linear-gradient(135deg,#6aa4ff,#5e5ce6)] text-white border-blue-300/40'
+                      : 'bg-white text-gray-800 border-gray-200'
+                  }`}
+                >
+                  {message.type === 'text' && <p className="whitespace-pre-wrap break-words text-[15px]">{message.content}</p>}
+
+                  {message.type === 'emoji' && message.url && (
+                    <img src={message.url} alt="emoji" className="w-20 h-20 object-cover rounded-2xl" />
+                  )}
+
+                  {(message.type === 'image' || message.type === 'video') && isPrivate && (
+                    <div className="mb-1 inline-flex items-center gap-1 text-[11px] font-semibold rounded-full px-2 py-0.5 bg-black/15 text-white">
+                      <Lock size={11} /> 阅后即焚
+                    </div>
+                  )}
+
+                  {(message.type === 'image' || message.type === 'video') && isLocked && (
+                    <button
+                      type="button"
+                      onClick={() => handleViewPrivateMessage(message)}
+                      className="block w-full text-left rounded-xl bg-black/30 px-3 py-5 text-white"
+                    >
+                      点击查看私密内容
+                    </button>
+                  )}
+
+                  {(message.type === 'image' || message.type === 'video') && !isLocked && (
+                    <>
+                      {message.type === 'image' && message.url && <img src={message.url} alt="chat-media" className="max-w-[240px] rounded-xl" />}
+                      {message.type === 'video' && message.url && <video src={message.url} controls className="max-w-[260px] rounded-xl" />}
+                      {!message.url && <div className="text-xs opacity-80">上传中...</div>}
+                    </>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 px-1 text-[10px] text-gray-400">
+                  <span>{new Date(message.createdAt).toLocaleTimeString()}</span>
+                  {isPrivate && message.destructAt && leftSeconds > 0 && (
+                    <span className="ios-chip ios-chip-danger !py-0 !px-2 !text-[10px] inline-flex items-center gap-1">
+                      <Clock3 size={10} /> {leftSeconds}s
+                    </span>
+                  )}
+                </div>
+
+                {message.type === 'image' && message.fileId && (
+                  <button
+                    type="button"
+                    onClick={() => handleSaveEmojiFromMessage(message)}
+                    className="text-[11px] text-blue-500 px-1"
+                  >
+                    保存为表情包
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+
+        {error && <div className="text-center text-xs text-red-500 py-2">{error}</div>}
         <div ref={messagesEndRef} />
-      </div>
+      </main>
 
-      <div style={styles.inputBar}>
-        <input type="file" accept="image/*,video/*" onChange={handleFileChange} style={styles.fileInput} disabled={sending} />
+      {showEmojiPanel && (
+        <section className="border-t border-gray-200 bg-white px-3 py-2 max-h-52 ios-scroll">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold text-gray-600">我的表情包</h3>
+            <button type="button" className="text-xs text-blue-500" onClick={() => emojiUploadRef.current?.click()}>
+              上传表情
+            </button>
+          </div>
+          {emojiLoading && <div className="text-xs text-gray-400">加载中...</div>}
+          {!emojiLoading && emojiPacks.length === 0 && <div className="text-xs text-gray-400">暂无表情包，先上传一张吧</div>}
+          <div className="grid grid-cols-6 gap-2">
+            {emojiPacks.map(item => (
+              <button
+                key={item._id}
+                type="button"
+                className="rounded-xl overflow-hidden bg-gray-100 aspect-square"
+                onClick={() => handleSendEmoji(item.fileId)}
+              >
+                {item.url && <img src={item.url} alt="emoji-pack" className="w-full h-full object-cover" />}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
-        <input
-          style={styles.textInput}
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="说点什么..."
-          disabled={sending}
-        />
+      <footer className="ios-blur ios-safe-bottom border-t border-gray-200 px-3 py-2 space-y-2">
+        <div className="flex items-center gap-2 text-xs text-gray-600">
+          <button
+            type="button"
+            onClick={() => setPrivateMode(prev => !prev)}
+            className={`ios-pill px-3 py-1 ${privateMode ? 'text-red-500 border-red-300 bg-red-50' : ''}`}
+          >
+            {privateMode ? '私密媒体: 开启' : '私密媒体: 关闭'}
+          </button>
 
-        <button
-          style={{
-            ...styles.sendBtn,
-            opacity: sending || !input.trim() ? 0.6 : 1
-          }}
-          onClick={handleSend}
-          disabled={sending || !input.trim()}
-          type="button"
-        >
-          发送
-        </button>
-      </div>
+          <select
+            className="ios-pill px-2 py-1 bg-white"
+            value={destructSeconds}
+            onChange={e => setDestructSeconds(Number(e.target.value))}
+            disabled={!privateMode}
+          >
+            {DESTRUCT_OPTIONS.map(option => (
+              <option key={option.value} value={option.value}>
+                销毁时间: {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="ios-button-secondary h-10 w-10 flex items-center justify-center"
+            onClick={() => mediaInputRef.current?.click()}
+            disabled={sending}
+          >
+            <ImagePlus size={18} />
+          </button>
+
+          <input
+            className="ios-input px-3 py-2"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="说点什么..."
+            disabled={sending}
+          />
+
+          <button
+            type="button"
+            className="ios-button-secondary h-10 w-10 flex items-center justify-center"
+            onClick={() => setShowEmojiPanel(prev => !prev)}
+          >
+            <Sticker size={17} />
+          </button>
+
+          <button
+            type="button"
+            className="ios-button-primary h-10 w-10 flex items-center justify-center disabled:opacity-60"
+            onClick={handleSendText}
+            disabled={sending || !input.trim()}
+          >
+            <Send size={16} />
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between text-[11px] text-gray-500">
+          <span>支持发送图片、长视频</span>
+          <button type="button" className="text-blue-500 inline-flex items-center gap-1" onClick={() => emojiUploadRef.current?.click()}>
+            <SmilePlus size={12} /> 导入表情
+          </button>
+        </div>
+      </footer>
+
+      <input ref={mediaInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleMediaInput} />
+      <input ref={emojiUploadRef} type="file" accept="image/*" className="hidden" onChange={handleEmojiUpload} />
     </div>
   )
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    position: 'relative',
-    minHeight: '100vh',
-    paddingBottom: NAV_HEIGHT + INPUT_BAR_HEIGHT,
-    background: '#f5f5f7',
-    color: '#333',
-    fontFamily: 'system-ui,-apple-system,BlinkMacSystemFont',
-    boxSizing: 'border-box'
-  },
-  header: {
-    padding: '8px 12px',
-    borderBottom: '1px solid #e5e5e5',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    background: '#ffffff'
-  },
-  select: {
-    background: '#f5f5f7',
-    color: '#333',
-    borderRadius: 16,
-    border: '1px solid #dddddd',
-    padding: '4px 10px',
-    fontSize: 12
-  },
-  messages: {
-    padding: '10px 12px',
-    background: '#f5f5f7',
-    overflowY: 'auto',
-    maxHeight: `calc(100vh - ${NAV_HEIGHT + INPUT_BAR_HEIGHT}px)`
-  },
-  msgRow: {
-    display: 'flex',
-    marginBottom: 8
-  },
-  msgBubble: {
-    maxWidth: '72%',
-    padding: '8px 10px',
-    borderRadius: 16,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
-    color: '#fff',
-    backgroundColor: '#ffffff',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
-  },
-  image: {
-    maxWidth: 220,
-    borderRadius: 8
-  },
-  video: {
-    maxWidth: 260,
-    borderRadius: 8
-  },
-  pendingFile: {
-    fontSize: 12,
-    opacity: 0.85
-  },
-  time: {
-    fontSize: 10,
-    opacity: 0.7,
-    marginTop: 4,
-    alignSelf: 'flex-end'
-  },
-  system: {
-    textAlign: 'center',
-    color: '#999',
-    fontSize: 12,
-    marginTop: 12
-  },
-  error: {
-    marginTop: 10,
-    textAlign: 'center',
-    color: '#d93c3c',
-    fontSize: 12
-  },
-  inputBar: {
-    position: 'fixed',
-    left: 0,
-    right: 0,
-    bottom: NAV_HEIGHT,
-    padding: '8px 10px',
-    borderTop: '1px solid #e5e5e5',
-    display: 'flex',
-    gap: 6,
-    alignItems: 'center',
-    background: '#ffffff',
-    zIndex: 10,
-    boxSizing: 'border-box'
-  },
-  fileInput: {
-    flexShrink: 0,
-    maxWidth: 100
-  },
-  textInput: {
-    flex: 1,
-    padding: '8px 12px',
-    borderRadius: 20,
-    border: '1px solid #dddddd',
-    outline: 'none',
-    background: '#f5f5f7',
-    color: '#333',
-    fontSize: 14
-  },
-  sendBtn: {
-    padding: '8px 16px',
-    borderRadius: 20,
-    border: 'none',
-    background: '#ff7aa5',
-    color: '#fff',
-    fontSize: 14,
-    cursor: 'pointer',
-    boxShadow: '0 2px 6px rgba(255,122,165,0.4)',
-    whiteSpace: 'nowrap'
-  }
 }
 
 export default ChatPage

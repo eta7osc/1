@@ -1,10 +1,20 @@
 ﻿# Lover's Secret
 
-基于 `React + TypeScript + Vite + CloudBase` 的情侣私密空间项目，包含聊天、纪念日、朋友圈和相册页。
+情侣双人私密应用（iOS 风 UI），基于 `React + TypeScript + Vite + CloudBase`。
 
-## 1. 本地开发
+## 已实现能力
 
-前置要求：Node.js 18+
+- 双人账号绑定（我 / 她）
+- 聊天（文本、图片、长视频）
+- 表情包系统（上传、从聊天图片保存、发送）
+- 私密媒体阅后即焚（可选销毁时间）
+- 家页面（原朋友圈）
+: 发布日常、点赞、评论，双端同步
+- 纪念日（云端同步、倒计时、提醒天数）
+- 照片墙（公共墙 + 私密墙）
+: 私密墙需要密码进入，支持图片/视频上传
+
+## 本地开发
 
 1. 安装依赖
 
@@ -12,68 +22,80 @@
 npm install
 ```
 
-2. 创建环境变量
+2. 配置环境变量
 
 ```bash
 cp .env.example .env.local
 ```
 
-并在 `.env.local` 填入：
+`.env.local` 示例：
 
 ```env
 VITE_CLOUDBASE_ENV_ID=你的云开发环境ID
-# 可选
+VITE_ME_INVITE_CODE=我方邀请码
+VITE_HER_INVITE_CODE=她方邀请码
+VITE_PRIVATE_WALL_PASSWORD=私密墙密码
+# VITE_MAX_CHAT_FILE_MB=300
 # VITE_PUBLIC_BASE=/lovers-message/
 ```
 
-3. 启动开发服务器
+3. 启动开发
 
 ```bash
 npm run dev
 ```
 
-## 2. 生产构建
+4. 生产构建
 
 ```bash
 npm run build
 ```
 
-构建产物在 `dist/`。
+## 腾讯云（CloudBase）准备项
 
-## 3. 腾讯云部署（静态托管）
+需要创建并开放以下集合：
 
-适用于 COS 静态网站托管或 CloudBase 静态托管。
+- `messages`
+- `emoji_packs`
+- `home_posts`
+- `anniversaries`
+- `wall_items`
+- `couple_accounts`
 
-1. 确认构建时 `VITE_PUBLIC_BASE` 与实际访问路径一致
-- 根域名部署：`/`
-- 子路径部署（示例）：`/lovers-message/`
+另外请确认：
 
-2. 上传 `dist/` 全部文件到静态托管目录。
+- 已开启匿名登录
+- 存储上传权限允许前端写入
+- 静态托管路径与 `VITE_PUBLIC_BASE` 一致（若子路径部署）
 
-3. 路由模式
-- 当前使用 `HashRouter`，不依赖服务端重写规则。
-- 访问路径带 `#`，可直接用于静态托管。
+## 功能说明
 
-4. CloudBase 权限与集合
-- 需存在集合：`messages`
-- 前端默认匿名登录，请在云开发控制台确认匿名登录已开启。
-- 上传文件会写入 `chat-media/` 路径，需确认存储权限。
+### 1. 家页面（原朋友圈）
 
-## 4. 常见问题
+- 导航名称已改为“家”
+- 支持图文/视频发布
+- 对方可点赞与评论，云端同步
 
-1. 页面能打开但聊天请求失败
-- 通常是 `VITE_CLOUDBASE_ENV_ID` 未配置或配置错误。
+### 2. 聊天
 
-2. 发布后资源 404
-- 通常是 `VITE_PUBLIC_BASE` 与部署子路径不一致。
+- 支持发送图片和长视频（默认 300MB，可通过 `VITE_MAX_CHAT_FILE_MB` 调整）
+- 聊天气泡已优化为 iOS 风格
+- 图片可一键保存为表情包并发送
 
-3. 附件上传失败
-- 仅支持图片/视频，且单文件最大 20MB。
+### 3. 阅后即焚
 
-## 5. 项目脚本
+- 发送图片/视频时可开启私密模式并选择销毁时间
+- 接收方首次查看后启动倒计时，超时自动失效
+
+### 4. 私密照片墙
+
+- 进入私密墙需输入密码（`VITE_PRIVATE_WALL_PASSWORD`）
+- 私密墙支持图片与视频上传
+
+## 脚本
 
 ```bash
-npm run dev      # 开发
-npm run build    # 生产构建
-npm run preview  # 本地预览构建结果
+npm run dev
+npm run build
+npm run preview
 ```

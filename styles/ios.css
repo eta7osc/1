@@ -1,0 +1,202 @@
+﻿:root {
+  --ios-bg: #f2f2f7;
+  --ios-bg-elevated: #ffffff;
+  --ios-primary: #0a84ff;
+  --ios-secondary: #5e5ce6;
+  --ios-danger: #ff3b30;
+  --ios-pink: #ff2d55;
+  --ios-text: #111827;
+  --ios-subtext: #6b7280;
+  --ios-border: rgba(60, 60, 67, 0.18);
+  --ios-glass: rgba(255, 255, 255, 0.78);
+  --ios-shadow: 0 10px 28px rgba(17, 24, 39, 0.1);
+  --safe-top: env(safe-area-inset-top);
+  --safe-bottom: env(safe-area-inset-bottom);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  width: 100%;
+  background: radial-gradient(circle at 20% 10%, #ffffff 0%, #f2f2f7 45%, #e9edf7 100%);
+  color: var(--ios-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.ios-page {
+  min-height: 100%;
+  background: transparent;
+}
+
+.ios-title {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ios-blur {
+  backdrop-filter: saturate(180%) blur(18px);
+  -webkit-backdrop-filter: saturate(180%) blur(18px);
+  background: var(--ios-glass);
+}
+
+.ios-card {
+  background: var(--ios-bg-elevated);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 20px;
+  box-shadow: var(--ios-shadow);
+}
+
+.ios-card-flat {
+  background: var(--ios-bg-elevated);
+  border-radius: 16px;
+  border: 1px solid var(--ios-border);
+}
+
+.ios-pill {
+  border-radius: 999px;
+  border: 1px solid var(--ios-border);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.ios-button-primary {
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--ios-primary), var(--ios-secondary));
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 10px 24px rgba(10, 132, 255, 0.3);
+}
+
+.ios-button-secondary {
+  border: 1px solid var(--ios-border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--ios-text);
+  font-weight: 600;
+}
+
+.ios-input {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--ios-border);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ios-text);
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ios-input:focus {
+  border-color: rgba(10, 132, 255, 0.55);
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.15);
+}
+
+.ios-segment {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(120, 120, 128, 0.12);
+}
+
+.ios-segment button {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 14px;
+  background: transparent;
+  color: var(--ios-subtext);
+  font-weight: 600;
+}
+
+.ios-segment button.is-active {
+  background: #fff;
+  color: var(--ios-text);
+  box-shadow: 0 2px 10px rgba(31, 41, 55, 0.14);
+}
+
+.ios-scroll {
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.ios-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.ios-safe-top {
+  padding-top: calc(var(--safe-top) + 8px);
+}
+
+.ios-safe-bottom {
+  padding-bottom: calc(var(--safe-bottom) + 8px);
+}
+
+.ios-tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  border-top: 1px solid var(--ios-border);
+}
+
+.ios-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ios-chip-danger {
+  color: var(--ios-danger);
+  background: rgba(255, 59, 48, 0.12);
+}
+
+.ios-chip-info {
+  color: var(--ios-primary);
+  background: rgba(10, 132, 255, 0.12);
+}
+
+.ios-chip-pink {
+  color: var(--ios-pink);
+  background: rgba(255, 45, 85, 0.12);
+}
+
+@media (min-width: 860px) {
+  .ios-app-frame {
+    max-width: 460px;
+    margin: 12px auto;
+    min-height: calc(100vh - 24px);
+    border-radius: 34px;
+    overflow: hidden;
+    box-shadow: 0 26px 60px rgba(17, 24, 39, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    background: rgba(242, 242, 247, 0.86);
+    backdrop-filter: blur(16px);
+  }
+
+  .ios-tabbar {
+    max-width: 460px;
+    margin: 0 auto;
+  }
+}
