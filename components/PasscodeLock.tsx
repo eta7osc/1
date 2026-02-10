@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useState } from 'react'
-import { ArrowRight, Delete, Lock } from 'lucide-react'
+import { ArrowRight, Delete, Heart, Lock } from 'lucide-react'
 import { STORAGE_KEYS } from '../constants'
 import { storage } from '../services/storageService'
 
@@ -64,25 +64,31 @@ const PasscodeLock: React.FC<PasscodeLockProps> = ({ onSuccess }) => {
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-white flex flex-col items-center px-8 text-center overflow-y-auto"
+      className="fixed inset-0 z-[100] flex flex-col items-center px-8 text-center overflow-y-auto"
       style={{
+        background:
+          'radial-gradient(circle at 14% 16%, rgba(255, 185, 200, 0.45) 0%, rgba(255, 185, 200, 0) 34%), radial-gradient(circle at 90% 4%, rgba(255, 227, 186, 0.48) 0%, rgba(255, 227, 186, 0) 30%), linear-gradient(180deg, #fff9fb 0%, #fff2f7 62%, #ffeef5 100%)',
         paddingTop: 'calc(env(safe-area-inset-top) + 40px)',
         paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)'
       }}
     >
-      <div className="mb-8 p-6 bg-pink-50 rounded-full">
-        <Lock size={48} className="text-pink-500" />
+      <div className="mb-4 ios-feature-badge">
+        <Heart size={12} /> 双人私密空间
       </div>
 
-      <h1 className="text-2xl font-bold mb-2">{mode === 'login' ? '输入访问密码' : '设置访问密码'}</h1>
-      <p className="text-gray-500 mb-8">{mode === 'login' ? '只有你们可以进入这个空间' : '使用数字和字母组合，增强安全性'}</p>
+      <div className="mb-8 p-6 bg-rose-50 rounded-full shadow-sm">
+        <Lock size={48} className="text-rose-500" />
+      </div>
+
+      <h1 className="text-2xl font-bold mb-2 text-rose-700">{mode === 'login' ? '输入访问密码' : '设置访问密码'}</h1>
+      <p className="ios-soft-text mb-8">{mode === 'login' ? '只有你们可以进入这个空间' : '使用数字和字母组合，增强安全性'}</p>
 
       <div className="flex gap-3 justify-center mb-4 min-h-[40px]">
         {Array.from({ length: Math.max(passcode.length, MIN_PASSCODE_LENGTH) }).map((_, i) => (
           <div
             key={i}
-            className={`w-4 h-4 rounded-full border-2 border-pink-500 transition-all ${
-              i < passcode.length ? 'bg-pink-500 scale-110' : 'bg-transparent'
+            className={`w-4 h-4 rounded-full border-2 border-rose-500 transition-all ${
+              i < passcode.length ? 'bg-rose-500 scale-110' : 'bg-transparent'
             }`}
           />
         ))}
@@ -96,7 +102,7 @@ const PasscodeLock: React.FC<PasscodeLockProps> = ({ onSuccess }) => {
             key={key}
             type="button"
             onClick={() => handleInput(key)}
-            className="w-16 h-16 rounded-full ios-blur flex items-center justify-center text-2xl font-medium active:bg-gray-300 transition-colors"
+            className="w-16 h-16 rounded-full ios-blur flex items-center justify-center text-2xl font-medium active:bg-rose-100 transition-colors"
           >
             {key}
           </button>
@@ -112,14 +118,14 @@ const PasscodeLock: React.FC<PasscodeLockProps> = ({ onSuccess }) => {
         <button
           type="button"
           onClick={handleSubmit}
-          className="w-16 h-16 rounded-full bg-pink-500 text-white flex items-center justify-center active:bg-pink-600 shadow-lg"
+          className="w-16 h-16 rounded-full bg-rose-500 text-white flex items-center justify-center active:bg-rose-600 shadow-lg"
         >
           <ArrowRight size={28} />
         </button>
       </div>
 
       <div className="mt-12 mb-4">
-        <button type="button" className="text-pink-500 font-medium text-sm">
+        <button type="button" className="text-rose-500 font-medium text-sm">
           忘记密码？可在后续版本通过密保找回
         </button>
       </div>

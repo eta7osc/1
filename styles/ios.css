@@ -1,15 +1,16 @@
 ﻿:root {
-  --ios-bg: #f2f2f7;
+  --ios-bg: #fff6f7;
+  --ios-bg-soft: #fff1f4;
   --ios-bg-elevated: #ffffff;
-  --ios-primary: #0a84ff;
-  --ios-secondary: #5e5ce6;
-  --ios-danger: #ff3b30;
-  --ios-pink: #ff2d55;
-  --ios-text: #111827;
-  --ios-subtext: #6b7280;
-  --ios-border: rgba(60, 60, 67, 0.18);
-  --ios-glass: rgba(255, 255, 255, 0.78);
-  --ios-shadow: 0 10px 28px rgba(17, 24, 39, 0.1);
+  --ios-primary: #ff4f7a;
+  --ios-primary-strong: #ff2f66;
+  --ios-secondary: #7b86ff;
+  --ios-accent: #ff9a8b;
+  --ios-text: #1f1f29;
+  --ios-subtext: #7e7b87;
+  --ios-border: rgba(90, 84, 112, 0.16);
+  --ios-glass: rgba(255, 255, 255, 0.72);
+  --ios-shadow: 0 16px 40px rgba(229, 93, 135, 0.16);
   --safe-top: env(safe-area-inset-top);
   --safe-bottom: env(safe-area-inset-bottom);
 }
@@ -24,9 +25,12 @@ body,
   margin: 0;
   min-height: 100%;
   width: 100%;
-  background: radial-gradient(circle at 20% 10%, #ffffff 0%, #f2f2f7 45%, #e9edf7 100%);
+  background:
+    radial-gradient(circle at 14% 2%, rgba(255, 182, 193, 0.4) 0%, rgba(255, 182, 193, 0) 32%),
+    radial-gradient(circle at 88% 10%, rgba(255, 214, 165, 0.44) 0%, rgba(255, 214, 165, 0) 28%),
+    linear-gradient(180deg, #fff9fa 0%, #fff3f6 42%, #ffeef2 100%);
   color: var(--ios-text);
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', sans-serif;
+  font-family: 'SF Pro Rounded', 'SF Pro Text', 'PingFang SC', 'Hiragino Sans GB', 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -53,6 +57,10 @@ select {
   letter-spacing: -0.02em;
 }
 
+.ios-soft-text {
+  color: var(--ios-subtext);
+}
+
 .ios-blur {
   backdrop-filter: saturate(180%) blur(18px);
   -webkit-backdrop-filter: saturate(180%) blur(18px);
@@ -60,61 +68,72 @@ select {
 }
 
 .ios-card {
-  background: var(--ios-bg-elevated);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.94));
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  border-radius: 24px;
   box-shadow: var(--ios-shadow);
 }
 
 .ios-card-flat {
   background: var(--ios-bg-elevated);
-  border-radius: 16px;
+  border-radius: 18px;
   border: 1px solid var(--ios-border);
 }
 
 .ios-pill {
   border-radius: 999px;
   border: 1px solid var(--ios-border);
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.86);
 }
 
 .ios-button-primary {
   border: none;
   border-radius: 14px;
-  background: linear-gradient(135deg, var(--ios-primary), var(--ios-secondary));
+  background: linear-gradient(135deg, var(--ios-primary), var(--ios-primary-strong));
   color: #fff;
   font-weight: 600;
-  box-shadow: 0 10px 24px rgba(10, 132, 255, 0.3);
+  box-shadow: 0 10px 22px rgba(255, 79, 122, 0.34);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.ios-button-primary:active {
+  transform: scale(0.98);
 }
 
 .ios-button-secondary {
   border: 1px solid var(--ios-border);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.96);
   color: var(--ios-text);
   font-weight: 600;
+  transition: transform 0.16s ease;
+}
+
+.ios-button-secondary:active {
+  transform: scale(0.98);
 }
 
 .ios-input {
   width: 100%;
   border-radius: 14px;
   border: 1px solid var(--ios-border);
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.95);
   color: var(--ios-text);
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .ios-input:focus {
-  border-color: rgba(10, 132, 255, 0.55);
-  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.15);
+  border-color: rgba(255, 79, 122, 0.42);
+  box-shadow: 0 0 0 3px rgba(255, 79, 122, 0.14);
+  background: #fff;
 }
 
 .ios-segment {
   display: inline-flex;
   padding: 4px;
   border-radius: 999px;
-  background: rgba(120, 120, 128, 0.12);
+  background: rgba(120, 120, 128, 0.14);
 }
 
 .ios-segment button {
@@ -124,12 +143,13 @@ select {
   background: transparent;
   color: var(--ios-subtext);
   font-weight: 600;
+  transition: all 0.2s ease;
 }
 
 .ios-segment button.is-active {
   background: #fff;
   color: var(--ios-text);
-  box-shadow: 0 2px 10px rgba(31, 41, 55, 0.14);
+  box-shadow: 0 4px 14px rgba(31, 41, 55, 0.14);
 }
 
 .ios-scroll {
@@ -168,18 +188,107 @@ select {
 }
 
 .ios-chip-danger {
-  color: var(--ios-danger);
-  background: rgba(255, 59, 48, 0.12);
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.14);
 }
 
 .ios-chip-info {
-  color: var(--ios-primary);
-  background: rgba(10, 132, 255, 0.12);
+  color: var(--ios-secondary);
+  background: rgba(123, 134, 255, 0.14);
 }
 
 .ios-chip-pink {
-  color: var(--ios-pink);
-  background: rgba(255, 45, 85, 0.12);
+  color: var(--ios-primary-strong);
+  background: rgba(255, 47, 102, 0.14);
+}
+
+.ios-floating-hearts {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.ios-floating-hearts span {
+  position: absolute;
+  display: block;
+  color: rgba(255, 79, 122, 0.2);
+  animation: float-heart linear infinite;
+}
+
+.ios-floating-hearts span:nth-child(1) {
+  left: 8%;
+  top: 85%;
+  font-size: 15px;
+  animation-duration: 14s;
+}
+
+.ios-floating-hearts span:nth-child(2) {
+  left: 22%;
+  top: 90%;
+  font-size: 20px;
+  animation-duration: 17s;
+  animation-delay: 1s;
+}
+
+.ios-floating-hearts span:nth-child(3) {
+  left: 56%;
+  top: 88%;
+  font-size: 16px;
+  animation-duration: 13s;
+  animation-delay: 2.5s;
+}
+
+.ios-floating-hearts span:nth-child(4) {
+  left: 74%;
+  top: 92%;
+  font-size: 22px;
+  animation-duration: 18s;
+  animation-delay: 0.5s;
+}
+
+.ios-floating-hearts span:nth-child(5) {
+  left: 90%;
+  top: 90%;
+  font-size: 14px;
+  animation-duration: 16s;
+  animation-delay: 2s;
+}
+
+@keyframes float-heart {
+  0% {
+    transform: translateY(0) scale(0.8);
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(-105vh) scale(1.1);
+    opacity: 0;
+  }
+}
+
+.ios-chat-bg {
+  background:
+    radial-gradient(circle at 18% 6%, rgba(255, 188, 210, 0.36), rgba(255, 188, 210, 0) 36%),
+    radial-gradient(circle at 86% 2%, rgba(255, 227, 186, 0.36), rgba(255, 227, 186, 0) 34%),
+    linear-gradient(180deg, #fff8fb 0%, #fff2f7 58%, #ffeef4 100%);
+}
+
+.ios-feature-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+  background: linear-gradient(135deg, #ff8fac, #ff5b87);
 }
 
 @media (min-width: 860px) {
@@ -189,14 +298,21 @@ select {
     min-height: calc(100vh - 24px);
     border-radius: 34px;
     overflow: hidden;
-    box-shadow: 0 26px 60px rgba(17, 24, 39, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.6);
-    background: rgba(242, 242, 247, 0.86);
+    box-shadow: 0 26px 60px rgba(153, 62, 108, 0.26);
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    background: rgba(255, 243, 247, 0.88);
     backdrop-filter: blur(16px);
   }
 
   .ios-tabbar {
     max-width: 460px;
     margin: 0 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ios-floating-hearts span {
+    animation: none;
+    opacity: 0;
   }
 }

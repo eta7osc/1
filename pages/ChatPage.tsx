@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Clock3, ImagePlus, Lock, Send, SmilePlus, Sticker } from 'lucide-react'
+import { Clock3, Heart, ImagePlus, Lock, Send, SmilePlus, Sticker } from 'lucide-react'
 import {
   EmojiPackItem,
   fetchEmojiPacks,
@@ -312,17 +312,26 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
 
   return (
     <div className="ios-page h-full flex flex-col">
-      <header className="ios-blur ios-safe-top px-4 pb-3 border-b border-gray-200/70">
+      <header className="ios-blur ios-safe-top px-4 pb-3 border-b border-white/70">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="ios-title text-xl">Lover&apos;s Secret</h1>
-            <p className="text-xs text-gray-500 mt-0.5">当前账号：{currentUserLabel}</p>
+            <p className="text-xs ios-soft-text mt-0.5">当前账号：{currentUserLabel}</p>
           </div>
-          <span className="ios-chip ios-chip-pink">私密聊天</span>
+          <div className="flex items-center gap-2">
+            <span className="ios-chip ios-chip-pink">私密聊天</span>
+            <span className="ios-feature-badge">
+              <Heart size={11} /> 两人专属
+            </span>
+          </div>
+        </div>
+        <div className="mt-3 flex items-center justify-between text-[11px] ios-soft-text">
+          <span>只属于你们的加密日常</span>
+          <span className={privateMode ? 'text-rose-500 font-semibold' : ''}>{privateMode ? '私密媒体已开启' : '私密媒体已关闭'}</span>
         </div>
       </header>
 
-      <main className="flex-1 ios-scroll px-3 py-3 space-y-2 bg-[linear-gradient(180deg,#f7f8fc_0%,#eef2fb_100%)]">
+      <main className="flex-1 ios-scroll px-3 py-3 space-y-2 ios-chat-bg">
         {loading && activeMessages.length === 0 && <div className="text-center text-xs text-gray-400">正在加载聊天记录...</div>}
         {!loading && activeMessages.length === 0 && <div className="text-center text-xs text-gray-400">还没有消息，发一条试试</div>}
 
@@ -338,8 +347,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
                 <div
                   className={`rounded-2xl px-3 py-2 shadow-sm border ${
                     isMine
-                      ? 'bg-[linear-gradient(135deg,#6aa4ff,#5e5ce6)] text-white border-blue-300/40'
-                      : 'bg-white text-gray-800 border-gray-200'
+                      ? 'bg-[linear-gradient(135deg,#ff7fa4,#ff4f7a)] text-white border-rose-300/50'
+                      : 'bg-white/95 text-gray-800 border-rose-100'
                   }`}
                 >
                   {message.type === 'text' && <p className="whitespace-pre-wrap break-words text-[15px]">{message.content}</p>}
@@ -386,7 +395,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
                   <button
                     type="button"
                     onClick={() => handleSaveEmojiFromMessage(message)}
-                    className="text-[11px] text-blue-500 px-1"
+                    className="text-[11px] text-rose-500 px-1"
                   >
                     保存为表情包
                   </button>
@@ -401,10 +410,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
       </main>
 
       {showEmojiPanel && (
-        <section className="border-t border-gray-200 bg-white px-3 py-2 max-h-52 ios-scroll">
+        <section className="border-t border-rose-100 bg-white/95 px-3 py-2 max-h-52 ios-scroll">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-gray-600">我的表情包</h3>
-            <button type="button" className="text-xs text-blue-500" onClick={() => emojiUploadRef.current?.click()}>
+            <h3 className="text-sm font-semibold text-gray-600">爱的表情包</h3>
+            <button type="button" className="text-xs text-rose-500" onClick={() => emojiUploadRef.current?.click()}>
               上传表情
             </button>
           </div>
@@ -425,12 +434,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
         </section>
       )}
 
-      <footer className="ios-blur ios-safe-bottom border-t border-gray-200 px-3 py-2 space-y-2">
+      <footer className="ios-blur ios-safe-bottom border-t border-white/80 px-3 py-2 space-y-2">
         <div className="flex items-center gap-2 text-xs text-gray-600">
           <button
             type="button"
             onClick={() => setPrivateMode(prev => !prev)}
-            className={`ios-pill px-3 py-1 ${privateMode ? 'text-red-500 border-red-300 bg-red-50' : ''}`}
+            className={`ios-pill px-3 py-1 ${privateMode ? 'text-rose-500 border-rose-300 bg-rose-50' : ''}`}
           >
             {privateMode ? '私密媒体: 开启' : '私密媒体: 关闭'}
           </button>
@@ -488,7 +497,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
 
         <div className="flex items-center justify-between text-[11px] text-gray-500">
           <span>支持发送图片、长视频</span>
-          <button type="button" className="text-blue-500 inline-flex items-center gap-1" onClick={() => emojiUploadRef.current?.click()}>
+          <button type="button" className="text-rose-500 inline-flex items-center gap-1" onClick={() => emojiUploadRef.current?.click()}>
             <SmilePlus size={12} /> 导入表情
           </button>
         </div>

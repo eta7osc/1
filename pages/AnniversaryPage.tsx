@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { CalendarClock, Plus, Trash2 } from 'lucide-react'
+import { CalendarClock, Heart, Plus, Trash2 } from 'lucide-react'
 import type { Sender } from '../services/chatService'
 import { AnniversaryItem, createAnniversary, fetchAnniversaries, removeAnniversary } from '../services/anniversaryService'
 
@@ -109,11 +109,14 @@ const AnniversaryPage: React.FC<AnniversaryPageProps> = ({ currentSender }) => {
 
   return (
     <div className="ios-page ios-scroll px-4 pb-32 ios-safe-top space-y-4">
-      <div className="ios-card p-4">
+      <div className="ios-card p-4 bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(255,237,244,0.9))]">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="ios-title text-2xl">纪念日</h2>
-            <p className="text-sm text-gray-500 mt-1">智能倒计时与提醒</p>
+            <p className="text-sm ios-soft-text mt-1">为重要时刻保留仪式感</p>
+            <div className="mt-2 ios-feature-badge">
+              <Heart size={11} /> 爱情计时器
+            </div>
           </div>
           <button type="button" className="ios-button-primary h-10 w-10 flex items-center justify-center" onClick={() => setShowAdd(true)}>
             <Plus size={18} />
@@ -133,7 +136,7 @@ const AnniversaryPage: React.FC<AnniversaryPageProps> = ({ currentSender }) => {
             <article key={item._id} className="ios-card p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 rounded-2xl bg-blue-100 text-blue-500 flex items-center justify-center">
+                  <div className="h-12 w-12 rounded-2xl bg-rose-100 text-rose-500 flex items-center justify-center">
                     <CalendarClock size={22} />
                   </div>
                   <div>
@@ -154,7 +157,7 @@ const AnniversaryPage: React.FC<AnniversaryPageProps> = ({ currentSender }) => {
                 </div>
                 <div className="text-right">
                   <div className="text-xs text-gray-500">倒计时</div>
-                  <div className="text-2xl font-bold text-blue-500 mt-1">{nextInfo ? `${nextInfo.diffDays} 天` : '--'}</div>
+                  <div className="text-2xl font-bold text-rose-500 mt-1">{nextInfo ? `${nextInfo.diffDays} 天` : '--'}</div>
                 </div>
               </div>
             </article>

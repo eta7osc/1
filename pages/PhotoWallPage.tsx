@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Eye, ImagePlus, Lock, ShieldAlert, Video } from 'lucide-react'
+import { Eye, Heart, ImagePlus, Lock, ShieldAlert, Video } from 'lucide-react'
 import { STORAGE_KEYS } from '../constants'
 import type { Sender } from '../services/chatService'
 import { createWallItem, fetchWallItems, WallItem } from '../services/photoWallService'
@@ -144,11 +144,14 @@ const PhotoWallPage: React.FC<PhotoWallPageProps> = ({ currentSender }) => {
 
   return (
     <div className="ios-page ios-scroll px-4 pb-32 ios-safe-top space-y-4">
-      <div className="ios-card p-4 space-y-4">
+      <div className="ios-card p-4 space-y-4 bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(255,237,244,0.9))]">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="ios-title text-2xl">照片墙</h2>
-            <p className="text-sm text-gray-500 mt-1">公开与私密回忆分区管理</p>
+            <p className="text-sm ios-soft-text mt-1">公开与私密回忆分区管理</p>
+            <div className="mt-2 ios-feature-badge">
+              <Heart size={11} /> 回忆收藏馆
+            </div>
           </div>
           <button type="button" className="ios-button-primary h-10 w-10 flex items-center justify-center" onClick={() => setShowUploadSheet(true)}>
             <ImagePlus size={18} />
@@ -206,8 +209,8 @@ const PhotoWallPage: React.FC<PhotoWallPageProps> = ({ currentSender }) => {
                     <img src={item.url} alt="wall-item" className="w-full h-full object-cover" />
                   )}
                 </div>
-                <div className="px-3 py-2">
-                  <div className="flex items-center justify-between text-xs text-gray-500">
+                  <div className="px-3 py-2">
+                  <div className="flex items-center justify-between text-xs ios-soft-text">
                     <span>{item.uploaderId === 'me' ? '我' : '她'}</span>
                     <span>{new Date(item.createdAt).toLocaleDateString()}</span>
                   </div>

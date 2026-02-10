@@ -12,6 +12,17 @@ export const app = cloudbase.init(hasEnvId ? { env: envId } : {})
 const authInstance = hasEnvId ? app.auth({ persistence: 'local' }) : null
 export const auth = authInstance
 
+export function getStorage() {
+  const maybeStorage = (app as any).storage
+  if (typeof maybeStorage === 'function') {
+    return maybeStorage.call(app)
+  }
+  if (maybeStorage && typeof maybeStorage === 'object') {
+    return maybeStorage
+  }
+  throw new Error('CloudBase storage 不可用，请检查 SDK 初始化')
+}
+
 function assertCloudBaseReady() {
   if (!hasEnvId || !authInstance) {
     throw new Error('CloudBase 未配置：请在 .env.local 中设置 VITE_CLOUDBASE_ENV_ID 并重启开发服务器。')

@@ -1,4 +1,4 @@
-ï»¿import { app, ensureLogin } from './cloudbaseClient'
+import { app, ensureLogin, getStorage } from './cloudbaseClient'
 import type { Sender } from './chatService'
 
 const ROOM_ID = 'couple-room'
@@ -80,17 +80,17 @@ function normalizePost(raw: any): HomePost {
 function assertMediaFile(file: File) {
   const isAllowed = file.type.startsWith('image/') || file.type.startsWith('video/')
   if (!isAllowed) {
-    throw new Error('å®¶é¡µé¢ä»…æ”¯æŒå›¾ç‰‡å’Œè§†é¢‘')
+    throw new Error('¼ÒÒ³Ãæ½öÖ§³ÖÍ¼Æ¬ºÍÊÓÆµ')
   }
 
   if (file.size > MAX_MEDIA_SIZE) {
-    throw new Error('æ–‡ä»¶è¿‡å¤§ï¼Œå®¶é¡µé¢å•æ–‡ä»¶æœ€å¤§ 300MB')
+    throw new Error('ÎÄ¼ş¹ı´ó£¬¼ÒÒ³Ãæµ¥ÎÄ¼ş×î´ó 300MB')
   }
 }
 
 async function uploadHomeMedia(file: File): Promise<HomeMedia> {
   assertMediaFile(file)
-  const storage = app.storage()
+  const storage = getStorage()
   const ext = file.name.split('.').pop() || 'bin'
   const cloudPath = `home-media/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
   const uploadRes = await storage.uploadFile({ cloudPath, file })
@@ -107,7 +107,7 @@ async function getTempUrlMap(fileIds: string[]) {
     return map
   }
 
-  const storage = app.storage()
+  const storage = getStorage()
   const tempRes = await storage.getTempFileURL({ fileList: fileIds })
 
   for (const item of tempRes.fileList || []) {
@@ -143,7 +143,7 @@ export async function createHomePost(authorId: Sender, content: string, files: F
   const text = content.trim()
 
   if (!text && files.length === 0) {
-    throw new Error('è¯·è¾“å…¥å†…å®¹æˆ–ä¸Šä¼ å›¾ç‰‡/è§†é¢‘')
+    throw new Error('ÇëÊäÈëÄÚÈİ»òÉÏ´«Í¼Æ¬/ÊÓÆµ')
   }
 
   const media: HomeMedia[] = []
@@ -170,7 +170,7 @@ export async function toggleHomeLike(postId: string, actor: Sender) {
   const res = await db.collection(COLLECTION).doc(postId).get()
   const row = res.data?.[0] as any
   if (!row) {
-    throw new Error('åŠ¨æ€ä¸å­˜åœ¨')
+    throw new Error('¶¯Ì¬²»´æÔÚ')
   }
 
   const currentLikes: Sender[] = Array.isArray(row.likes) ? row.likes.map((like: unknown) => (like === 'her' ? 'her' : 'me')) : []
@@ -190,7 +190,7 @@ export async function addHomeComment(postId: string, actor: Sender, content: str
   const res = await db.collection(COLLECTION).doc(postId).get()
   const row = res.data?.[0] as any
   if (!row) {
-    throw new Error('åŠ¨æ€ä¸å­˜åœ¨')
+    throw new Error('¶¯Ì¬²»´æÔÚ')
   }
 
   const comments = Array.isArray(row.comments) ? row.comments : []

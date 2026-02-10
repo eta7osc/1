@@ -1,4 +1,4 @@
-ï»¿import { app, ensureLogin } from './cloudbaseClient'
+import { app, ensureLogin, getStorage } from './cloudbaseClient'
 
 export type MsgType = 'text' | 'image' | 'video' | 'emoji'
 export type Sender = 'me' | 'her'
@@ -94,21 +94,21 @@ function normalizeEmojiPack(raw: any): EmojiPackItem {
 function assertValidChatFile(file: File) {
   const isAllowed = file.type.startsWith('image/') || file.type.startsWith('video/')
   if (!isAllowed) {
-    throw new Error('ä»…æ”¯æŒå›¾ç‰‡æˆ–è§†é¢‘æ–‡ä»¶')
+    throw new Error('½öÖ§³ÖÍ¼Æ¬»òÊÓÆµÎÄ¼ş')
   }
 
   if (file.size > MAX_CHAT_FILE_SIZE) {
-    throw new Error(`æ–‡ä»¶è¿‡å¤§ï¼Œæœ€å¤§æ”¯æŒ ${Math.round(MAX_CHAT_FILE_SIZE / 1024 / 1024)}MB`)
+    throw new Error(`ÎÄ¼ş¹ı´ó£¬×î´óÖ§³Ö ${Math.round(MAX_CHAT_FILE_SIZE / 1024 / 1024)}MB`)
   }
 }
 
 function assertValidEmojiFile(file: File) {
   if (!file.type.startsWith('image/')) {
-    throw new Error('è¡¨æƒ…åŒ…ä»…æ”¯æŒå›¾ç‰‡')
+    throw new Error('±íÇé°ü½öÖ§³ÖÍ¼Æ¬')
   }
 
   if (file.size > MAX_EMOJI_FILE_SIZE) {
-    throw new Error('è¡¨æƒ…åŒ…å›¾ç‰‡ä¸èƒ½è¶…è¿‡ 10MB')
+    throw new Error('±íÇé°üÍ¼Æ¬²»ÄÜ³¬¹ı 10MB')
   }
 }
 
@@ -118,7 +118,7 @@ async function getTempUrlMap(fileIds: string[]) {
     return map
   }
 
-  const storage = app.storage()
+  const storage = getStorage()
   const tempRes = await storage.getTempFileURL({ fileList: fileIds })
 
   for (const item of tempRes.fileList || []) {
@@ -139,7 +139,7 @@ function isMessageExpired(message: Message) {
 }
 
 async function uploadMediaFile(file: File, folder: string) {
-  const storage = app.storage()
+  const storage = getStorage()
   const ext = file.name.split('.').pop() || 'bin'
   const cloudPath = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
 
@@ -263,7 +263,7 @@ export async function fetchEmojiPacks(limit = 80): Promise<EmojiPackItem[]> {
 export async function saveEmojiPackFromMessage(senderId: Sender, fileId: string) {
   await ensureLogin()
   if (!fileId) {
-    throw new Error('å›¾ç‰‡æ–‡ä»¶ä¸å­˜åœ¨ï¼Œæ— æ³•ä¿å­˜ä¸ºè¡¨æƒ…åŒ…')
+    throw new Error('Í¼Æ¬ÎÄ¼ş²»´æÔÚ£¬ÎŞ·¨±£´æÎª±íÇé°ü')
   }
 
   const db = app.database()
@@ -292,7 +292,7 @@ export async function uploadEmojiPack(senderId: Sender, file: File) {
 export async function sendEmojiMessage(senderId: Sender, fileId: string) {
   await ensureLogin()
   if (!fileId) {
-    throw new Error('è¡¨æƒ…åŒ…æ–‡ä»¶ä¸å­˜åœ¨')
+    throw new Error('±íÇé°üÎÄ¼ş²»´æÔÚ')
   }
 
   const db = app.database()

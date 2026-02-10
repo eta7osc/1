@@ -1,4 +1,4 @@
-ï»¿import { app, ensureLogin } from './cloudbaseClient'
+import { app, ensureLogin, getStorage } from './cloudbaseClient'
 import type { Sender } from './chatService'
 
 const ROOM_ID = 'couple-room'
@@ -44,16 +44,16 @@ function normalizeItem(raw: any): WallItem {
 function assertWallFile(file: File) {
   const isAllowed = file.type.startsWith('image/') || file.type.startsWith('video/')
   if (!isAllowed) {
-    throw new Error('ç…§ç‰‡å¢™ä»…æ”¯æŒå›¾ç‰‡å’Œè§†é¢‘')
+    throw new Error('ÕÕÆ¬Ç½½öÖ§³ÖÍ¼Æ¬ºÍÊÓÆµ')
   }
 
   if (file.size > MAX_MEDIA_SIZE) {
-    throw new Error('æ–‡ä»¶è¿‡å¤§ï¼Œç…§ç‰‡å¢™å•æ–‡ä»¶æœ€å¤§ 500MB')
+    throw new Error('ÎÄ¼ş¹ı´ó£¬ÕÕÆ¬Ç½µ¥ÎÄ¼ş×î´ó 500MB')
   }
 }
 
 async function uploadWallFile(file: File) {
-  const storage = app.storage()
+  const storage = getStorage()
   const ext = file.name.split('.').pop() || 'bin'
   const cloudPath = `wall-media/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
   const uploadRes = await storage.uploadFile({ cloudPath, file })
@@ -66,7 +66,7 @@ async function getTempUrlMap(fileIds: string[]) {
     return map
   }
 
-  const storage = app.storage()
+  const storage = getStorage()
   const tempRes = await storage.getTempFileURL({ fileList: fileIds })
 
   for (const item of tempRes.fileList || []) {

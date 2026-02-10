@@ -39,14 +39,14 @@ const AccountBindPage: React.FC<{ onBound: (profile: AccountProfile) => void; st
 
   return (
     <div className="ios-page flex min-h-screen items-center justify-center p-6">
-      <div className="ios-card w-full max-w-sm p-6 space-y-5">
+      <div className="ios-card w-full max-w-sm p-6 space-y-5 relative z-10">
         <div className="flex items-center gap-3">
-          <div className="h-11 w-11 rounded-2xl bg-blue-100 text-blue-500 flex items-center justify-center">
+          <div className="h-11 w-11 rounded-2xl bg-rose-100 text-rose-500 flex items-center justify-center">
             <ShieldCheck size={22} />
           </div>
           <div>
             <h2 className="ios-title text-2xl">绑定情侣账号</h2>
-            <p className="text-xs text-gray-500">仅允许两位使用，身份绑定后自动同步</p>
+            <p className="text-xs ios-soft-text">仅允许你们两位使用，绑定后自动互联同步</p>
           </div>
         </div>
 
@@ -86,7 +86,7 @@ const SettingsPage: React.FC<{ account: AccountProfile; onRebind: () => void }> 
     <div className="ios-card p-5 space-y-5">
       <div>
         <h2 className="ios-title text-2xl">设置</h2>
-        <p className="text-sm text-gray-500 mt-1">管理账号和安全选项</p>
+        <p className="text-sm ios-soft-text mt-1">管理身份、安全和双人空间</p>
       </div>
 
       <div className="ios-card-flat overflow-hidden">
@@ -94,13 +94,13 @@ const SettingsPage: React.FC<{ account: AccountProfile; onRebind: () => void }> 
           <span>当前账号</span>
           <span className="ios-chip ios-chip-info">{account.nickname}</span>
         </div>
-        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div className="px-4 py-3 border-b border-gray-100/80 flex items-center justify-between">
           <span>双人绑定状态</span>
           <span className="text-green-600 text-sm font-semibold">正常</span>
         </div>
         <button type="button" className="w-full px-4 py-3 text-left flex items-center justify-between" onClick={onRebind}>
           <span>切换/重绑账号</span>
-          <span className="text-blue-500 text-sm font-semibold">重新绑定</span>
+          <span className="text-rose-500 text-sm font-semibold">重新绑定</span>
         </button>
       </div>
     </div>
@@ -112,35 +112,35 @@ const TabBar: React.FC = () => (
     <div className="flex justify-around items-center pt-2 pb-2">
       <NavLink
         to="/"
-        className={({ isActive }) => `flex flex-col items-center gap-1 py-1 transition-colors ${isActive ? 'text-blue-500' : 'text-gray-400'}`}
+        className={({ isActive }) => `flex flex-col items-center gap-1 py-1 transition-colors ${isActive ? 'text-rose-500' : 'text-gray-400'}`}
       >
         <MessageCircle size={22} />
         <span className="text-[10px] font-semibold">聊天</span>
       </NavLink>
       <NavLink
         to="/anniversary"
-        className={({ isActive }) => `flex flex-col items-center gap-1 py-1 transition-colors ${isActive ? 'text-blue-500' : 'text-gray-400'}`}
+        className={({ isActive }) => `flex flex-col items-center gap-1 py-1 transition-colors ${isActive ? 'text-rose-500' : 'text-gray-400'}`}
       >
         <CalendarClock size={22} />
         <span className="text-[10px] font-semibold">纪念日</span>
       </NavLink>
       <NavLink
         to="/home"
-        className={({ isActive }) => `flex flex-col items-center gap-1 py-1 transition-colors ${isActive ? 'text-blue-500' : 'text-gray-400'}`}
+        className={({ isActive }) => `flex flex-col items-center gap-1 py-1 transition-colors ${isActive ? 'text-rose-500' : 'text-gray-400'}`}
       >
         <House size={22} />
-        <span className="text-[10px] font-semibold">家</span>
+        <span className="text-[10px] font-semibold">家园</span>
       </NavLink>
       <NavLink
         to="/photos"
-        className={({ isActive }) => `flex flex-col items-center gap-1 py-1 transition-colors ${isActive ? 'text-blue-500' : 'text-gray-400'}`}
+        className={({ isActive }) => `flex flex-col items-center gap-1 py-1 transition-colors ${isActive ? 'text-rose-500' : 'text-gray-400'}`}
       >
         <Camera size={22} />
         <span className="text-[10px] font-semibold">照片墙</span>
       </NavLink>
       <NavLink
         to="/settings"
-        className={({ isActive }) => `flex flex-col items-center gap-1 py-1 transition-colors ${isActive ? 'text-blue-500' : 'text-gray-400'}`}
+        className={({ isActive }) => `flex flex-col items-center gap-1 py-1 transition-colors ${isActive ? 'text-rose-500' : 'text-gray-400'}`}
       >
         <Settings size={22} />
         <span className="text-[10px] font-semibold">设置</span>
@@ -216,20 +216,30 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="ios-app-frame ios-page flex min-h-screen flex-col overflow-hidden">
-      <main className="flex-1 overflow-hidden pb-24">
-        <Suspense fallback={<div className="h-full flex items-center justify-center text-gray-500">加载中...</div>}>
-          <Routes>
-            <Route path="/" element={<ChatPage currentSender={account.role} currentUserLabel={account.nickname} />} />
-            <Route path="/anniversary" element={<AnniversaryPage currentSender={account.role} />} />
-            <Route path="/home" element={<HomePage currentSender={account.role} />} />
-            <Route path="/moments" element={<Navigate to="/home" replace />} />
-            <Route path="/photos" element={<PhotoWallPage currentSender={account.role} />} />
-            <Route path="/settings" element={settingsPage} />
-          </Routes>
-        </Suspense>
-      </main>
-      <TabBar />
+    <div className="ios-page min-h-screen relative overflow-hidden">
+      <div className="ios-floating-hearts" aria-hidden>
+        <span>❤</span>
+        <span>❤</span>
+        <span>❤</span>
+        <span>❤</span>
+        <span>❤</span>
+      </div>
+
+      <div className="ios-app-frame ios-page flex min-h-screen flex-col overflow-hidden relative z-10">
+        <main className="flex-1 overflow-hidden pb-24">
+          <Suspense fallback={<div className="h-full flex items-center justify-center text-gray-500">加载中...</div>}>
+            <Routes>
+              <Route path="/" element={<ChatPage currentSender={account.role} currentUserLabel={account.nickname} />} />
+              <Route path="/anniversary" element={<AnniversaryPage currentSender={account.role} />} />
+              <Route path="/home" element={<HomePage currentSender={account.role} />} />
+              <Route path="/moments" element={<Navigate to="/home" replace />} />
+              <Route path="/photos" element={<PhotoWallPage currentSender={account.role} />} />
+              <Route path="/settings" element={settingsPage} />
+            </Routes>
+          </Suspense>
+        </main>
+        <TabBar />
+      </div>
     </div>
   )
 }

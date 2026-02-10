@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Heart, MessageCircle, Plus, Send, Video } from 'lucide-react'
+import { Heart, MessageCircle, Plus, Send, Sparkles, Video } from 'lucide-react'
 import type { Sender } from '../services/chatService'
 import { addHomeComment, createHomePost, fetchHomePosts, HomePost, toggleHomeLike } from '../services/homeService'
 
@@ -150,11 +150,14 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender }) => {
 
   return (
     <div className="ios-page ios-scroll pb-32 px-4 ios-safe-top space-y-4">
-      <div className="ios-card p-4">
+      <div className="ios-card p-4 bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(255,237,244,0.9))]">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="ios-title text-2xl">家</h2>
-            <p className="text-sm text-gray-500 mt-1">{headerTitle}</p>
+            <p className="text-sm ios-soft-text mt-1">{headerTitle}</p>
+            <div className="mt-2 ios-feature-badge">
+              <Sparkles size={11} /> 你们的恋爱时间线
+            </div>
           </div>
           <button type="button" className="ios-button-primary px-4 py-2 text-sm" onClick={() => setShowComposer(true)}>
             <span className="inline-flex items-center gap-1">
@@ -178,7 +181,7 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender }) => {
             <article key={post._id} className="ios-card p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="ios-chip ios-chip-info">{roleLabel(post.authorId)}</div>
-                <span className="text-xs text-gray-400">{new Date(post.createdAt).toLocaleString()}</span>
+                <span className="text-xs ios-soft-text">{new Date(post.createdAt).toLocaleString()}</span>
               </div>
 
               {post.content && <p className="text-[15px] leading-relaxed text-gray-800 whitespace-pre-wrap">{post.content}</p>}
@@ -201,9 +204,9 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender }) => {
                 <button
                   type="button"
                   onClick={() => handleToggleLike(post._id)}
-                  className={`inline-flex items-center gap-1 text-sm ${liked ? 'text-pink-500' : 'text-gray-500'}`}
+                  className={`inline-flex items-center gap-1 text-sm ${liked ? 'text-rose-500' : 'text-gray-500'}`}
                 >
-                  <Heart size={16} className={liked ? 'fill-pink-500' : ''} />
+                  <Heart size={16} className={liked ? 'fill-rose-500' : ''} />
                   {post.likes.length}
                 </button>
                 <span className="inline-flex items-center gap-1 text-sm text-gray-500">
@@ -215,7 +218,7 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender }) => {
               <div className="space-y-2">
                 {post.comments.map(comment => (
                   <div key={comment.id} className="rounded-xl bg-gray-100 px-3 py-2 text-sm">
-                    <span className="font-semibold text-blue-500 mr-1">{roleLabel(comment.authorId)}</span>
+                    <span className="font-semibold text-rose-500 mr-1">{roleLabel(comment.authorId)}</span>
                     <span>{comment.content}</span>
                   </div>
                 ))}
