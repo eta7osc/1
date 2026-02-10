@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Lock, Delete, ArrowRight } from 'lucide-react';
 import { storage } from '../services/storageService';
@@ -58,7 +57,7 @@ const PasscodeLock: React.FC<PasscodeLockProps> = ({ onSuccess }) => {
       ['1', '2', '3'],
       ['4', '5', '6'],
       ['7', '8', '9'],
-      ['A', '0', 'B']
+      ['A', '0', 'B'],
     ];
 
     return (
@@ -90,17 +89,27 @@ const PasscodeLock: React.FC<PasscodeLockProps> = ({ onSuccess }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-white safe-pt flex flex-col items-center justify-center px-8 text-center">
+    <div
+      className="fixed inset-0 z-[100] bg-white flex flex-col items-center px-8 text-center overflow-y-auto"
+      style={{
+        // 顶部：系统安全区 + 额外 40px 间距，避免被刘海/灵动岛挡住
+        paddingTop: 'calc(env(safe-area-inset-top) + 40px)',
+        // 底部：给将来底部导航 / 手势条留一点空间
+        paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)',
+      }}
+    >
       <div className="mb-8 p-6 bg-pink-50 rounded-full">
         <Lock size={48} className="text-pink-500" />
       </div>
-      
+
       <h1 className="text-2xl font-bold mb-2">
         {mode === 'login' ? '输入访问密码' : '设置私密密码'}
       </h1>
       <p className="text-gray-500 mb-8">
-        {mode === 'login' ? '只有我们可以进入的空间' : '设置一个仅属于我们的数字字母组合密码'}
-      </p>
+        {mode === 'login'
+          ? '只有我们可以进入的空间'
+          : '设置一个仅属于我们的数字字母组合密码'}
+      </p >
 
       <div className="flex gap-3 justify-center mb-4 min-h-[40px]">
         {Array.from({ length: Math.max(passcode.length, 4) }).map((_, i) => (
@@ -113,12 +122,18 @@ const PasscodeLock: React.FC<PasscodeLockProps> = ({ onSuccess }) => {
         ))}
       </div>
 
-      {error && <p className="text-red-500 text-sm animate__animated animate__shakeX">{error}</p>}
+      {error && (
+        <p className="text-red-500 text-sm animate__animated animate__shakeX">
+          {error}
+        </p >
+      )}
 
       {renderKeypad()}
 
-      <div className="mt-12">
-        <button className="text-pink-500 font-medium text-sm">忘记密码？通过私密问题找回</button>
+      <div className="mt-12 mb-4">
+        <button className="text-pink-500 font-medium text-sm">
+          忘记密码？通过私密问题找回
+        </button>
       </div>
     </div>
   );

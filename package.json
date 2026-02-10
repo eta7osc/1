@@ -9,10 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^19.2.3",
+    "@cloudbase/js-sdk": "^2.25.4",
     "lucide-react": "^0.562.0",
-    "react-router-dom": "^7.12.0",
-    "react-dom": "^19.2.3"
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-router-dom": "^7.12.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
