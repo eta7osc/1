@@ -2,7 +2,15 @@
 import { HashRouter as Router, Navigate, NavLink, Route, Routes } from 'react-router-dom'
 import { CalendarClock, Camera, House, MessageCircle, Settings, ShieldCheck, UserCircle2 } from 'lucide-react'
 import PasscodeLock from './components/PasscodeLock'
-import { AccountProfile, bindAccount, getBoundAccount, unbindCurrentAccount, updateAccountAvatar } from './services/accountService'
+import {
+  AccountProfile,
+  CoupleAvatarMap,
+  bindAccount,
+  getBoundAccount,
+  getCoupleAvatarMap,
+  unbindCurrentAccount,
+  updateAccountAvatar
+} from './services/accountService'
 import type { Sender } from './services/chatService'
 
 const ChatPage = lazy(() => import('./pages/ChatPage'))
@@ -230,6 +238,7 @@ const AppContent: React.FC = () => {
   const [isLocked, setIsLocked] = useState(true)
   const [accountLoading, setAccountLoading] = useState(false)
   const [account, setAccount] = useState<AccountProfile | null>(null)
+  const [avatarMap, setAvatarMap] = useState<CoupleAvatarMap>({})
   const [startupError, setStartupError] = useState('')
 
   useEffect(() => {
@@ -259,6 +268,18 @@ const AppContent: React.FC = () => {
         }
       })
 
+    getCoupleAvatarMap()
+      .then(map => {
+        if (active) {
+          setAvatarMap(map)
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setAvatarMap({})
+        }
+      })
+
     return () => {
       active = false
     }
@@ -272,10 +293,22 @@ const AppContent: React.FC = () => {
     return (
       <SettingsPage
         account={account}
-        onProfileChange={setAccount}
+        onProfileChange={profile => {
+          setAccount(profile)
+          setAvatarMap(prev => {
+            const next = { ...prev }
+            if (profile.avatarUrl) {
+              next[profile.role] = profile.avatarUrl
+            } else {
+              delete next[profile.role]
+            }
+            return next
+          })
+        }}
         onRebind={async () => {
           await unbindCurrentAccount()
           setAccount(null)
+          setAvatarMap({})
         }}
       />
     )
@@ -311,11 +344,16 @@ const AppContent: React.FC = () => {
                 <Route
                   path="/"
                   element={
-                    <ChatPage currentSender={account.role} currentUserLabel={account.nickname} currentUserAvatar={account.avatarUrl} />
+                    <ChatPage
+                      currentSender={account.role}
+                      currentUserLabel={account.nickname}
+                      currentUserAvatar={account.avatarUrl}
+                      avatarMap={avatarMap}
+                    />
                   }
                 />
                 <Route path="/anniversary" element={<AnniversaryPage currentSender={account.role} />} />
-                <Route path="/home" element={<HomePage currentSender={account.role} />} />
+                <Route path="/home" element={<HomePage currentSender={account.role} avatarMap={avatarMap} />} />
                 <Route path="/moments" element={<Navigate to="/home" replace />} />
                 <Route path="/photos" element={<PhotoWallPage currentSender={account.role} />} />
                 <Route path="/settings" element={settingsPage} />

@@ -13,6 +13,8 @@ export interface AccountProfile {
   avatarUrl?: string
 }
 
+export type CoupleAvatarMap = Partial<Record<Sender, string>>
+
 function getExpectedInviteCode(role: Sender) {
   return role === 'me' ? import.meta.env.VITE_ME_INVITE_CODE : import.meta.env.VITE_HER_INVITE_CODE
 }
@@ -224,4 +226,24 @@ export async function updateAccountAvatar(file: File): Promise<AccountProfile> {
   }
   saveCachedProfile(profile)
   return profile
+}
+
+export async function getCoupleAvatarMap(): Promise<CoupleAvatarMap> {
+  await ensureLogin()
+
+  const db = app.database()
+  const res = await db.collection(ACCOUNT_COLLECTION).get()
+  const rows = (res.data || []) as any[]
+
+  const map: CoupleAvatarMap = {}
+  for (const row of rows) {
+    const role: Sender = row?.role === 'her' ? 'her' : 'me'
+    const avatarFileId = typeof row?.avatarFileId === 'string' ? row.avatarFileId : undefined
+    const avatarUrl = await resolveAvatarUrl(avatarFileId)
+    if (avatarUrl) {
+      map[role] = avatarUrl
+    }
+  }
+
+  return map
 }

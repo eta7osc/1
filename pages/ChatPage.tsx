@@ -28,6 +28,7 @@ interface ChatPageProps {
   currentSender: Sender
   currentUserLabel: string
   currentUserAvatar?: string
+  avatarMap?: Partial<Record<Sender, string>>
 }
 
 function isMessageDestroyed(message: Message, nowMs: number) {
@@ -53,7 +54,7 @@ function getVoiceMimeType() {
   return candidates.find(type => MediaRecorder.isTypeSupported(type))
 }
 
-const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, currentUserAvatar }) => {
+const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, currentUserAvatar, avatarMap }) => {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -485,12 +486,16 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
 
         {activeMessages.map(message => {
           const isMine = message.senderId === currentSender
+          const avatarUrl = message.senderId === currentSender ? currentUserAvatar || avatarMap?.[currentSender] : avatarMap?.[message.senderId]
           const isPrivate = Boolean(message.privateMedia && (message.type === 'image' || message.type === 'video'))
           const isLocked = isPrivate && message.senderId !== currentSender && !message.viewedAt
           const leftSeconds = remainingSeconds(message, nowMs)
 
           return (
-            <div key={message._id} className={`w-full flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+            <div key={message._id} className={`w-full flex items-end gap-2 ${isMine ? 'justify-end flex-row-reverse' : 'justify-start'}`}>
+              <div className="h-9 w-9 rounded-full overflow-hidden bg-rose-100 text-rose-400 border border-rose-200/80 shrink-0 flex items-center justify-center">
+                {avatarUrl ? <img src={avatarUrl} alt="chat-avatar" className="h-full w-full object-cover" /> : <UserCircle2 size={20} />}
+              </div>
               <div className={`max-w-[78%] relative ${isMine ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
                 <div
                   className={`rounded-2xl px-3 py-2 shadow-sm border ${

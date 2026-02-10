@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Heart, Image as ImageIcon, MessageCircle, Plus, Send, Sparkles, Video, X } from 'lucide-react'
+import { Heart, Image as ImageIcon, MessageCircle, Plus, Send, Sparkles, UserCircle2, Video, X } from 'lucide-react'
 import type { Sender } from '../services/chatService'
 import { addHomeComment, createHomePost, fetchHomePosts, HomePost, toggleHomeLike } from '../services/homeService'
 
 interface HomePageProps {
   currentSender: Sender
+  avatarMap?: Partial<Record<Sender, string>>
 }
 
 interface DraftFile {
@@ -27,7 +28,7 @@ function getImageGridClass(count: number) {
   return 'grid-cols-3'
 }
 
-const HomePage: React.FC<HomePageProps> = ({ currentSender }) => {
+const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
   const [posts, setPosts] = useState<HomePost[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -232,12 +233,18 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender }) => {
       <div className="space-y-4">
         {posts.map(post => {
           const liked = post.likes.includes(currentSender)
+          const postAvatar = avatarMap?.[post.authorId]
           const imageMedia = post.media.filter(media => media.type === 'image')
           const videoMedia = post.media.filter(media => media.type === 'video')
           return (
             <article key={post._id} className="ios-card p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <div className="ios-chip ios-chip-info">{roleLabel(post.authorId)}</div>
+                <div className="flex items-center gap-2">
+                  <div className="h-9 w-9 rounded-full overflow-hidden bg-rose-100 text-rose-400 border border-rose-200/80 flex items-center justify-center">
+                    {postAvatar ? <img src={postAvatar} alt="post-avatar" className="h-full w-full object-cover" /> : <UserCircle2 size={20} />}
+                  </div>
+                  <div className="ios-chip ios-chip-info">{roleLabel(post.authorId)}</div>
+                </div>
                 <span className="text-xs ios-soft-text">{new Date(post.createdAt).toLocaleString()}</span>
               </div>
               <div className="text-[11px] text-rose-400">仅你们彼此可见</div>
