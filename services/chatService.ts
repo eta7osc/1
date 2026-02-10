@@ -1,6 +1,6 @@
-import { app, ensureLogin, getStorage } from './cloudbaseClient'
+ï»¿import { app, ensureLogin, getStorage } from './cloudbaseClient'
 
-export type MsgType = 'text' | 'image' | 'video' | 'emoji'
+export type MsgType = 'text' | 'image' | 'video' | 'emoji' | 'audio'
 export type Sender = 'me' | 'her'
 
 export interface Message {
@@ -66,11 +66,15 @@ function normalizeDate(value: unknown): string {
 }
 
 function normalizeMessage(raw: any): Message {
+  const type = raw?.type
+  const normalizedType: MsgType =
+    type === 'image' || type === 'video' || type === 'emoji' || type === 'audio' ? type : 'text'
+
   return {
     _id: String(raw?._id ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`),
     roomId: String(raw?.roomId ?? ROOM_ID),
     senderId: raw?.senderId === 'her' ? 'her' : 'me',
-    type: raw?.type === 'image' || raw?.type === 'video' || raw?.type === 'emoji' ? raw.type : 'text',
+    type: normalizedType,
     content: typeof raw?.content === 'string' ? raw.content : '',
     fileId: typeof raw?.fileId === 'string' ? raw.fileId : undefined,
     createdAt: normalizeDate(raw?.createdAt),
@@ -92,23 +96,23 @@ function normalizeEmojiPack(raw: any): EmojiPackItem {
 }
 
 function assertValidChatFile(file: File) {
-  const isAllowed = file.type.startsWith('image/') || file.type.startsWith('video/')
+  const isAllowed = file.type.startsWith('image/') || file.type.startsWith('video/') || file.type.startsWith('audio/')
   if (!isAllowed) {
-    throw new Error('½öÖ§³ÖÍ¼Æ¬»òÊÓÆµÎÄ¼ş')
+    throw new Error('ä»…æ”¯æŒå›¾ç‰‡ã€è§†é¢‘æˆ–è¯­éŸ³æ–‡ä»¶')
   }
 
   if (file.size > MAX_CHAT_FILE_SIZE) {
-    throw new Error(`ÎÄ¼ş¹ı´ó£¬×î´óÖ§³Ö ${Math.round(MAX_CHAT_FILE_SIZE / 1024 / 1024)}MB`)
+    throw new Error(`æ–‡ä»¶è¿‡å¤§ï¼Œæœ€å¤§æ”¯æŒ ${Math.round(MAX_CHAT_FILE_SIZE / 1024 / 1024)}MB`)
   }
 }
 
 function assertValidEmojiFile(file: File) {
   if (!file.type.startsWith('image/')) {
-    throw new Error('±íÇé°ü½öÖ§³ÖÍ¼Æ¬')
+    throw new Error('è¡¨æƒ…åŒ…ä»…æ”¯æŒå›¾ç‰‡')
   }
 
   if (file.size > MAX_EMOJI_FILE_SIZE) {
-    throw new Error('±íÇé°üÍ¼Æ¬²»ÄÜ³¬¹ı 10MB')
+    throw new Error('è¡¨æƒ…åŒ…å›¾ç‰‡ä¸èƒ½è¶…è¿‡ 10MB')
   }
 }
 
@@ -206,7 +210,7 @@ export async function sendFileMessage(senderId: Sender, file: File, options: Sen
   await ensureLogin()
 
   const fileId = await uploadMediaFile(file, 'chat-media')
-  const type: MsgType = file.type.startsWith('image/') ? 'image' : 'video'
+  const type: MsgType = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'audio'
 
   const privateMedia = Boolean(options.privateMedia)
   const selfDestructSeconds = privateMedia ? Math.max(10, Number(options.selfDestructSeconds || 60)) : undefined
@@ -263,7 +267,7 @@ export async function fetchEmojiPacks(limit = 80): Promise<EmojiPackItem[]> {
 export async function saveEmojiPackFromMessage(senderId: Sender, fileId: string) {
   await ensureLogin()
   if (!fileId) {
-    throw new Error('Í¼Æ¬ÎÄ¼ş²»´æÔÚ£¬ÎŞ·¨±£´æÎª±íÇé°ü')
+    throw new Error('å›¾ç‰‡æ–‡ä»¶ä¸å­˜åœ¨ï¼Œæ— æ³•ä¿å­˜ä¸ºè¡¨æƒ…åŒ…')
   }
 
   const db = app.database()
@@ -292,7 +296,7 @@ export async function uploadEmojiPack(senderId: Sender, file: File) {
 export async function sendEmojiMessage(senderId: Sender, fileId: string) {
   await ensureLogin()
   if (!fileId) {
-    throw new Error('±íÇé°üÎÄ¼ş²»´æÔÚ')
+    throw new Error('è¡¨æƒ…åŒ…æ–‡ä»¶ä¸å­˜åœ¨')
   }
 
   const db = app.database()

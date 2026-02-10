@@ -1,9 +1,10 @@
-
+﻿
 export enum MessageType {
   TEXT = 'text',
   IMAGE = 'image',
   VIDEO = 'video',
-  EMOJI = 'emoji'
+  EMOJI = 'emoji',
+  AUDIO = 'audio'
 }
 
 export interface Message {
@@ -47,3 +48,4 @@ export interface PhotoAlbum {
   name: string;
   photos: string[];
 }
+

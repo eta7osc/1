@@ -1,8 +1,8 @@
-﻿import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react'
+﻿import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { HashRouter as Router, Navigate, NavLink, Route, Routes } from 'react-router-dom'
-import { CalendarClock, Camera, House, MessageCircle, Settings, ShieldCheck } from 'lucide-react'
+import { CalendarClock, Camera, House, MessageCircle, Settings, ShieldCheck, UserCircle2 } from 'lucide-react'
 import PasscodeLock from './components/PasscodeLock'
-import { AccountProfile, bindAccount, getBoundAccount, unbindCurrentAccount } from './services/accountService'
+import { AccountProfile, bindAccount, getBoundAccount, unbindCurrentAccount, updateAccountAvatar } from './services/accountService'
 import type { Sender } from './services/chatService'
 
 const ChatPage = lazy(() => import('./pages/ChatPage'))
@@ -81,9 +81,17 @@ const AccountBindPage: React.FC<{ onBound: (profile: AccountProfile) => void; st
   )
 }
 
-const SettingsPage: React.FC<{ account: AccountProfile; onRebind: () => Promise<void> }> = ({ account, onRebind }) => {
+interface SettingsPageProps {
+  account: AccountProfile
+  onRebind: () => Promise<void>
+  onProfileChange: (profile: AccountProfile) => void
+}
+
+const SettingsPage: React.FC<SettingsPageProps> = ({ account, onRebind, onProfileChange }) => {
   const [rebinding, setRebinding] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [error, setError] = useState('')
+  const avatarInputRef = useRef<HTMLInputElement | null>(null)
 
   const handleRebind = async () => {
     try {
@@ -96,12 +104,56 @@ const SettingsPage: React.FC<{ account: AccountProfile; onRebind: () => Promise<
     }
   }
 
+  const handleAvatarInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+
+    if (!file || uploadingAvatar) {
+      return
+    }
+
+    try {
+      setUploadingAvatar(true)
+      setError('')
+      const profile = await updateAccountAvatar(file)
+      onProfileChange(profile)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '头像更新失败，请稍后重试')
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
+
   return (
     <div className="ios-page px-4 pb-32 ios-safe-top ios-scroll">
       <div className="ios-card p-5 space-y-5">
         <div>
           <h2 className="ios-title text-2xl">设置</h2>
           <p className="text-sm ios-soft-text mt-1">管理身份、安全和双人空间</p>
+        </div>
+
+        <div className="ios-card-flat p-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-14 w-14 rounded-full overflow-hidden bg-rose-100 text-rose-400 flex items-center justify-center">
+              {account.avatarUrl ? (
+                <img src={account.avatarUrl} alt="avatar" className="h-full w-full object-cover" />
+              ) : (
+                <UserCircle2 size={40} />
+              )}
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-700">我的头像</p>
+              <p className="text-xs text-gray-500">支持 jpg/png/webp，大小不超过 5MB</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => avatarInputRef.current?.click()}
+            disabled={uploadingAvatar}
+            className="ios-button-secondary px-3 py-2 text-sm disabled:opacity-60"
+          >
+            {uploadingAvatar ? '上传中...' : '更换头像'}
+          </button>
         </div>
 
         <div className="ios-card-flat overflow-hidden">
@@ -126,6 +178,8 @@ const SettingsPage: React.FC<{ account: AccountProfile; onRebind: () => Promise<
 
         {error && <div className="text-sm text-red-500">{error}</div>}
       </div>
+
+      <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarInput} />
     </div>
   )
 }
@@ -218,6 +272,7 @@ const AppContent: React.FC = () => {
     return (
       <SettingsPage
         account={account}
+        onProfileChange={setAccount}
         onRebind={async () => {
           await unbindCurrentAccount()
           setAccount(null)
@@ -253,7 +308,12 @@ const AppContent: React.FC = () => {
           <Suspense fallback={<div className="h-full flex items-center justify-center text-gray-500">加载中...</div>}>
             <div className="flex-1 min-h-0">
               <Routes>
-                <Route path="/" element={<ChatPage currentSender={account.role} currentUserLabel={account.nickname} />} />
+                <Route
+                  path="/"
+                  element={
+                    <ChatPage currentSender={account.role} currentUserLabel={account.nickname} currentUserAvatar={account.avatarUrl} />
+                  }
+                />
                 <Route path="/anniversary" element={<AnniversaryPage currentSender={account.role} />} />
                 <Route path="/home" element={<HomePage currentSender={account.role} />} />
                 <Route path="/moments" element={<Navigate to="/home" replace />} />

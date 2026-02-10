@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Clock3, Heart, ImagePlus, Lock, Send, SmilePlus, Sticker } from 'lucide-react'
+import { Clock3, Heart, ImagePlus, Lock, Mic, Send, SmilePlus, Square, Sticker, UserCircle2 } from 'lucide-react'
 import {
   EmojiPackItem,
   fetchEmojiPacks,
@@ -15,6 +15,7 @@ import {
 } from '../services/chatService'
 
 const POLL_INTERVAL_MS = 5000
+const MAX_VOICE_SECONDS = 60
 const DESTRUCT_OPTIONS = [
   { label: '关闭', value: 0 },
   { label: '30 秒', value: 30 },
@@ -26,6 +27,7 @@ const DESTRUCT_OPTIONS = [
 interface ChatPageProps {
   currentSender: Sender
   currentUserLabel: string
+  currentUserAvatar?: string
 }
 
 function isMessageDestroyed(message: Message, nowMs: number) {
@@ -42,7 +44,16 @@ function remainingSeconds(message: Message, nowMs: number) {
   return Math.max(0, Math.ceil((new Date(message.destructAt).getTime() - nowMs) / 1000))
 }
 
-const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) => {
+function getVoiceMimeType() {
+  if (typeof MediaRecorder === 'undefined') {
+    return undefined
+  }
+
+  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
+  return candidates.find(type => MediaRecorder.isTypeSupported(type))
+}
+
+const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, currentUserAvatar }) => {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -54,12 +65,18 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
   const [emojiPacks, setEmojiPacks] = useState<EmojiPackItem[]>([])
   const [emojiLoading, setEmojiLoading] = useState(false)
   const [nowMs, setNowMs] = useState(Date.now())
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordingSeconds, setRecordingSeconds] = useState(0)
 
   const isLoadingRef = useRef(false)
   const pollTimerRef = useRef<number | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const mediaInputRef = useRef<HTMLInputElement | null>(null)
   const emojiUploadRef = useRef<HTMLInputElement | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const recordingTimerRef = useRef<number | null>(null)
+  const recordingSecondsRef = useRef(0)
 
   const scrollToBottom = useCallback(() => {
     if (messagesEndRef.current) {
@@ -124,9 +141,16 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
     }
   }, [])
 
+  const clearRecordingTimer = useCallback(() => {
+    if (recordingTimerRef.current) {
+      window.clearInterval(recordingTimerRef.current)
+      recordingTimerRef.current = null
+    }
+  }, [])
+
   const handleSendText = useCallback(async () => {
     const text = input.trim()
-    if (!text || sending) {
+    if (!text || sending || isRecording) {
       return
     }
 
@@ -157,7 +181,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
     } finally {
       setSending(false)
     }
-  }, [input, sending, currentSender, loadMessages])
+  }, [currentSender, input, isRecording, loadMessages, sending])
 
   const handleSendMedia = useCallback(
     async (file: File) => {
@@ -196,23 +220,134 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
     [currentSender, destructSeconds, loadMessages, privateMode]
   )
 
+  const handleSendAudio = useCallback(
+    async (blob: Blob, durationSeconds: number) => {
+      const safeSeconds = Math.min(MAX_VOICE_SECONDS, Math.max(1, Math.floor(durationSeconds)))
+      const ext = blob.type.includes('mp4') ? 'm4a' : 'webm'
+      const file = new File([blob], `voice-${Date.now()}.${ext}`, { type: blob.type || 'audio/webm' })
+
+      setSending(true)
+      setError('')
+
+      const tempId = `local-audio-${Date.now()}`
+      const tempMsg: Message = {
+        _id: tempId,
+        roomId: 'couple-room',
+        senderId: currentSender,
+        type: 'audio',
+        content: `语音 ${safeSeconds}s`,
+        createdAt: new Date().toISOString()
+      }
+
+      setMessages(prev => [...prev, tempMsg])
+
+      try {
+        await sendFileMessage(currentSender, file)
+        await loadMessages(false)
+      } catch (err) {
+        console.error('[Chat] send audio failed', err)
+        setMessages(prev => prev.filter(message => message._id !== tempId))
+        setError(err instanceof Error ? err.message : '语音发送失败')
+      } finally {
+        setSending(false)
+      }
+    },
+    [currentSender, loadMessages]
+  )
+
+  const handleStopRecording = useCallback(() => {
+    const recorder = mediaRecorderRef.current
+    if (!recorder) {
+      return
+    }
+
+    if (recorder.state !== 'inactive') {
+      recorder.stop()
+    }
+
+    clearRecordingTimer()
+    setIsRecording(false)
+  }, [clearRecordingTimer])
+
+  const handleStartRecording = useCallback(async () => {
+    if (sending || isRecording) {
+      return
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setError('当前设备不支持语音录制')
+      return
+    }
+
+    try {
+      setError('')
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = getVoiceMimeType()
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
+
+      audioChunksRef.current = []
+      recordingSecondsRef.current = 0
+      setRecordingSeconds(0)
+      setIsRecording(true)
+      mediaRecorderRef.current = recorder
+
+      recorder.ondataavailable = event => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
+        }
+      }
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(track => track.stop())
+        const chunks = audioChunksRef.current
+        audioChunksRef.current = []
+        mediaRecorderRef.current = null
+
+        const duration = recordingSecondsRef.current
+        if (chunks.length === 0 || duration <= 0) {
+          return
+        }
+
+        const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' })
+        await handleSendAudio(blob, duration)
+      }
+
+      recorder.start()
+      clearRecordingTimer()
+      recordingTimerRef.current = window.setInterval(() => {
+        const next = recordingSecondsRef.current + 1
+        recordingSecondsRef.current = next
+        setRecordingSeconds(next)
+
+        if (next >= MAX_VOICE_SECONDS) {
+          handleStopRecording()
+        }
+      }, 1000)
+    } catch (err) {
+      console.error('[Chat] start recording failed', err)
+      setIsRecording(false)
+      clearRecordingTimer()
+      setError(err instanceof Error ? err.message : '无法开始录音，请检查麦克风权限')
+    }
+  }, [clearRecordingTimer, handleSendAudio, handleStopRecording, isRecording, sending])
+
   const handleMediaInput = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0]
       e.target.value = ''
-      if (!file || sending) {
+      if (!file || sending || isRecording) {
         return
       }
       await handleSendMedia(file)
     },
-    [handleSendMedia, sending]
+    [handleSendMedia, isRecording, sending]
   )
 
   const handleEmojiUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
 
-    if (!file || sending) {
+    if (!file || sending || isRecording) {
       return
     }
 
@@ -301,6 +436,16 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
     scrollToBottom()
   }, [messages, scrollToBottom])
 
+  useEffect(() => {
+    return () => {
+      clearRecordingTimer()
+      const recorder = mediaRecorderRef.current
+      if (recorder && recorder.state !== 'inactive') {
+        recorder.stop()
+      }
+    }
+  }, [clearRecordingTimer])
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault()
@@ -319,6 +464,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
             <p className="text-xs ios-soft-text mt-0.5">当前账号：{currentUserLabel}</p>
           </div>
           <div className="flex items-center gap-2">
+            <div className="h-9 w-9 rounded-full overflow-hidden bg-rose-100 text-rose-400 flex items-center justify-center border border-rose-200/80">
+              {currentUserAvatar ? <img src={currentUserAvatar} alt="my-avatar" className="h-full w-full object-cover" /> : <UserCircle2 size={24} />}
+            </div>
             <span className="ios-chip ios-chip-pink">私密聊天</span>
             <span className="ios-feature-badge">
               <Heart size={11} /> 两人专属
@@ -336,7 +484,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
         {!loading && activeMessages.length === 0 && <div className="text-center text-xs text-gray-400">还没有消息，发一条试试</div>}
 
         {activeMessages.map(message => {
-          const isMine = message.senderId === 'me'
+          const isMine = message.senderId === currentSender
           const isPrivate = Boolean(message.privateMedia && (message.type === 'image' || message.type === 'video'))
           const isLocked = isPrivate && message.senderId !== currentSender && !message.viewedAt
           const leftSeconds = remainingSeconds(message, nowMs)
@@ -378,6 +526,16 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
                       {message.type === 'image' && message.url && <img src={message.url} alt="chat-media" className="max-w-[240px] rounded-xl" />}
                       {message.type === 'video' && message.url && <video src={message.url} controls className="max-w-[260px] rounded-xl" />}
                       {!message.url && <div className="text-xs opacity-80">上传中...</div>}
+                    </>
+                  )}
+
+                  {message.type === 'audio' && (
+                    <>
+                      {message.url ? (
+                        <audio src={message.url} controls className={isMine ? 'w-56 accent-white' : 'w-56'} preload="metadata" />
+                      ) : (
+                        <div className="text-xs opacity-80">语音上传中...</div>
+                      )}
                     </>
                   )}
                 </div>
@@ -440,6 +598,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
             type="button"
             onClick={() => setPrivateMode(prev => !prev)}
             className={`ios-pill px-3 py-1 ${privateMode ? 'text-rose-500 border-rose-300 bg-rose-50' : ''}`}
+            disabled={isRecording}
           >
             {privateMode ? '私密媒体: 开启' : '私密媒体: 关闭'}
           </button>
@@ -448,7 +607,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
             className="ios-pill px-2 py-1 bg-white"
             value={destructSeconds}
             onChange={e => setDestructSeconds(Number(e.target.value))}
-            disabled={!privateMode}
+            disabled={!privateMode || isRecording}
           >
             {DESTRUCT_OPTIONS.map(option => (
               <option key={option.value} value={option.value}>
@@ -456,6 +615,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
               </option>
             ))}
           </select>
+
+          {isRecording && <span className="text-rose-500 font-semibold">录音中 {recordingSeconds}s / {MAX_VOICE_SECONDS}s</span>}
         </div>
 
         <div className="flex items-center gap-2">
@@ -463,7 +624,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
             type="button"
             className="ios-button-secondary h-10 w-10 flex items-center justify-center"
             onClick={() => mediaInputRef.current?.click()}
-            disabled={sending}
+            disabled={sending || isRecording}
           >
             <ImagePlus size={18} />
           </button>
@@ -473,30 +634,41 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="说点什么..."
-            disabled={sending}
+            placeholder={isRecording ? '录音中，停止后可输入文本...' : '说点什么...'}
+            disabled={sending || isRecording}
           />
 
           <button
             type="button"
-            className="ios-button-secondary h-10 w-10 flex items-center justify-center"
+            className={`ios-button-secondary h-10 w-10 flex items-center justify-center ${isRecording ? 'opacity-60' : ''}`}
             onClick={() => setShowEmojiPanel(prev => !prev)}
+            disabled={isRecording}
           >
             <Sticker size={17} />
           </button>
 
           <button
             type="button"
+            className={`h-10 w-10 flex items-center justify-center rounded-xl text-white ${isRecording ? 'bg-rose-500' : 'bg-sky-500'} disabled:opacity-60`}
+            onClick={isRecording ? handleStopRecording : handleStartRecording}
+            disabled={sending}
+            title={isRecording ? '停止录音并发送' : '录制语音'}
+          >
+            {isRecording ? <Square size={15} /> : <Mic size={16} />}
+          </button>
+
+          <button
+            type="button"
             className="ios-button-primary h-10 w-10 flex items-center justify-center disabled:opacity-60"
             onClick={handleSendText}
-            disabled={sending || !input.trim()}
+            disabled={sending || !input.trim() || isRecording}
           >
             <Send size={16} />
           </button>
         </div>
 
         <div className="flex items-center justify-between text-[11px] text-gray-500">
-          <span>支持发送图片、长视频</span>
+          <span>支持发送图片、长视频、最长 60 秒语音</span>
           <button type="button" className="text-rose-500 inline-flex items-center gap-1" onClick={() => emojiUploadRef.current?.click()}>
             <SmilePlus size={12} /> 导入表情
           </button>

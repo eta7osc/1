@@ -79,6 +79,14 @@ function normalizePost(raw: any): HomePost {
   }
 }
 
+function getDocRow(res: any): any {
+  const data = res?.data
+  if (Array.isArray(data)) {
+    return data[0]
+  }
+  return data || null
+}
+
 function assertMediaFile(file: File) {
   const isAllowed = file.type.startsWith('image/') || file.type.startsWith('video/')
   if (!isAllowed) {
@@ -182,7 +190,7 @@ export async function toggleHomeLike(postId: string, actor: Sender) {
   await ensureLogin()
   const db = app.database()
   const res = await db.collection(COLLECTION).doc(postId).get()
-  const row = res.data?.[0] as any
+  const row = getDocRow(res) as any
   if (!row) {
     throw new Error('动态不存在')
   }
@@ -202,7 +210,7 @@ export async function addHomeComment(postId: string, actor: Sender, content: str
 
   const db = app.database()
   const res = await db.collection(COLLECTION).doc(postId).get()
-  const row = res.data?.[0] as any
+  const row = getDocRow(res) as any
   if (!row) {
     throw new Error('动态不存在')
   }
@@ -217,4 +225,3 @@ export async function addHomeComment(postId: string, actor: Sender, content: str
 
   await db.collection(COLLECTION).doc(postId).update({ comments })
 }
-

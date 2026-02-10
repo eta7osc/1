@@ -1,13 +1,16 @@
-﻿import { getCurrentUid, app, ensureLogin } from './cloudbaseClient'
+﻿import { getCurrentUid, app, ensureLogin, getStorage } from './cloudbaseClient'
 import type { Sender } from './chatService'
 
 const ACCOUNT_COLLECTION = 'couple_accounts'
 const ACCOUNT_STORAGE_KEY = 'lovers_secret_account_profile'
+const MAX_AVATAR_FILE_SIZE = 5 * 1024 * 1024
 
 export interface AccountProfile {
   uid: string
   role: Sender
   nickname: string
+  avatarFileId?: string
+  avatarUrl?: string
 }
 
 function getExpectedInviteCode(role: Sender) {
@@ -37,6 +40,43 @@ function readCachedProfile(): AccountProfile | null {
 
 function saveCachedProfile(profile: AccountProfile) {
   localStorage.setItem(ACCOUNT_STORAGE_KEY, JSON.stringify(profile))
+}
+
+async function resolveAvatarUrl(fileId?: string): Promise<string | undefined> {
+  if (!fileId) {
+    return undefined
+  }
+
+  try {
+    const storage = getStorage()
+    const res = await storage.getTempFileURL({ fileList: [fileId] })
+    const item = res.fileList?.[0]
+    if (item?.code === 'SUCCESS' && item.tempFileURL) {
+      return String(item.tempFileURL)
+    }
+  } catch {
+    // ignore
+  }
+
+  return undefined
+}
+
+function assertValidAvatar(file: File) {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('头像仅支持图片文件')
+  }
+
+  if (file.size > MAX_AVATAR_FILE_SIZE) {
+    throw new Error('头像大小不能超过 5MB')
+  }
+}
+
+async function uploadAvatar(file: File): Promise<string> {
+  const storage = getStorage()
+  const ext = file.name.split('.').pop() || 'png'
+  const cloudPath = `avatars/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+  const uploadRes = await storage.uploadFile({ cloudPath, filePath: file as any })
+  return String(uploadRes.fileID)
 }
 
 export function clearCachedProfile() {
@@ -70,7 +110,12 @@ export async function getBoundAccount(): Promise<AccountProfile | null> {
 
   const cached = readCachedProfile()
   if (cached && cached.uid === uid) {
-    return cached
+    const profile: AccountProfile = {
+      ...cached,
+      avatarUrl: await resolveAvatarUrl(cached.avatarFileId)
+    }
+    saveCachedProfile(profile)
+    return profile
   }
 
   const db = app.database()
@@ -81,10 +126,14 @@ export async function getBoundAccount(): Promise<AccountProfile | null> {
     return null
   }
 
+  const role = row.role === 'her' ? 'her' : 'me'
+  const avatarFileId = typeof row.avatarFileId === 'string' ? row.avatarFileId : undefined
   const profile: AccountProfile = {
     uid,
-    role: row.role === 'her' ? 'her' : 'me',
-    nickname: roleToNickname(row.role === 'her' ? 'her' : 'me')
+    role,
+    nickname: roleToNickname(role),
+    avatarFileId,
+    avatarUrl: await resolveAvatarUrl(avatarFileId)
   }
   saveCachedProfile(profile)
   return profile
@@ -121,6 +170,7 @@ export async function bindAccount(role: Sender, inviteCode: string): Promise<Acc
     uid,
     role,
     nickname: roleToNickname(role),
+    avatarFileId: typeof currentRow?.avatarFileId === 'string' ? currentRow.avatarFileId : null,
     updatedAt: new Date()
   }
 
@@ -130,10 +180,47 @@ export async function bindAccount(role: Sender, inviteCode: string): Promise<Acc
     await db.collection(ACCOUNT_COLLECTION).add(payload)
   }
 
+  const avatarFileId = typeof currentRow?.avatarFileId === 'string' ? currentRow.avatarFileId : undefined
   const profile: AccountProfile = {
     uid,
     role,
-    nickname: roleToNickname(role)
+    nickname: roleToNickname(role),
+    avatarFileId,
+    avatarUrl: await resolveAvatarUrl(avatarFileId)
+  }
+  saveCachedProfile(profile)
+  return profile
+}
+
+export async function updateAccountAvatar(file: File): Promise<AccountProfile> {
+  assertValidAvatar(file)
+  await ensureLogin()
+
+  const uid = await getCurrentUid()
+  if (!uid) {
+    throw new Error('账号初始化失败，请刷新页面重试')
+  }
+
+  const db = app.database()
+  const query = await db.collection(ACCOUNT_COLLECTION).where({ uid }).limit(1).get()
+  const row = query.data?.[0] as any
+  if (!row?._id) {
+    throw new Error('请先绑定账号，再设置头像')
+  }
+
+  const avatarFileId = await uploadAvatar(file)
+  await db.collection(ACCOUNT_COLLECTION).doc(row._id).update({
+    avatarFileId,
+    updatedAt: new Date()
+  })
+
+  const role = row.role === 'her' ? 'her' : 'me'
+  const profile: AccountProfile = {
+    uid,
+    role,
+    nickname: roleToNickname(role),
+    avatarFileId,
+    avatarUrl: await resolveAvatarUrl(avatarFileId)
   }
   saveCachedProfile(profile)
   return profile
