@@ -311,7 +311,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
   const activeMessages = useMemo(() => messages.filter(message => !isMessageDestroyed(message, nowMs)), [messages, nowMs])
 
   return (
-    <div className="ios-page h-full flex flex-col">
+    <div className="ios-page h-full min-h-full flex flex-col">
       <header className="ios-blur ios-safe-top px-4 pb-3 border-b border-white/70">
         <div className="flex items-center justify-between">
           <div>

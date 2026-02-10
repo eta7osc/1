@@ -226,7 +226,7 @@ const AppContent: React.FC = () => {
       </div>
 
       <div className="ios-app-frame ios-page flex min-h-screen flex-col overflow-hidden relative z-10">
-        <main className="flex-1 overflow-hidden pb-24">
+        <main className="flex-1 overflow-hidden">
           <Suspense fallback={<div className="h-full flex items-center justify-center text-gray-500">加载中...</div>}>
             <Routes>
               <Route path="/" element={<ChatPage currentSender={account.role} currentUserLabel={account.nickname} />} />
