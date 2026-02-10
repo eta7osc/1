@@ -9,13 +9,18 @@ export const app = cloudbase.init({
 })
 
 // 使用本地持久化保存登录态
-const auth = app.auth({ persistence: 'local' })
+export const auth = app.auth({ persistence: 'local' })
 
-// 确保当前有登录态（匿名登录）
+// 确保当前有登录态（匿名登录，兼容新版 SDK）
 export async function ensureLogin() {
-  const loginState = await auth.getLoginState()
+  // 1. 先看看有没有已有登录态
+  let loginState = await auth.getLoginState()
+
+  // 2. 没有的话就走匿名登录
   if (!loginState) {
-    await auth.anonymousAuthProvider().signIn()
+    const res = await auth.signInAnonymously()
+    loginState = res.loginState
   }
-  return auth.currentUser
+
+  return loginState
 }

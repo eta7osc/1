@@ -8,11 +8,15 @@ import {
   Sender
 } from '../services/chatService'
 
+// 底部导航栏（“聊天 / 纪念日 / 朋友圈 / 相册 / 设置”）的大致高度
+const NAV_HEIGHT = 60
+
 const ChatPage: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [senderId, setSenderId] = useState<Sender>('me')
   const [loading, setLoading] = useState(false)
+  const [sending, setSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
   const scrollToBottom = () => {
@@ -22,21 +26,54 @@ const ChatPage: React.FC = () => {
   }
 
   const loadMessages = async () => {
-    setLoading(true)
     try {
+      setLoading(true)
       const data = await fetchMessages()
       setMessages(data)
       setTimeout(scrollToBottom, 100)
+    } catch (err) {
+      console.error('加载消息失败', err)
     } finally {
       setLoading(false)
     }
   }
 
   const handleSend = async () => {
-    if (!input.trim()) return
-    await sendTextMessage(senderId, input)
+    const text = input.trim()
+    if (!text || sending) return
+
+    console.log('[Chat] 点击发送按钮, text =', text, 'senderId =', senderId)
+
+    // 先清空输入框，让用户感觉“发出去了”
     setInput('')
-    await loadMessages()
+    setSending(true)
+
+    // 构造一条“本地临时消息”，先插到列表里（乐观更新）
+    const tempId = 'local-' + Date.now()
+    const tempMsg: Message = {
+      _id: tempId as any,
+      senderId,
+      type: 'text',
+      content: text,
+      createdAt: new Date().toISOString()
+    } as Message
+
+    setMessages(prev => [...prev, tempMsg])
+    setTimeout(scrollToBottom, 50)
+
+    try {
+      await sendTextMessage(senderId, text)
+      console.log('[Chat] 发送成功，即将重新拉取列表')
+      await loadMessages()
+    } catch (err) {
+      console.error('[Chat] 发送失败', err)
+      // 回滚临时消息 + 把内容放回输入框
+      setMessages(prev => prev.filter(m => m._id !== tempId))
+      setInput(text)
+      alert('消息发送失败，请检查网络或后端配置（CloudBase / API）')
+    } finally {
+      setSending(false)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -48,10 +85,37 @@ const ChatPage: React.FC = () => {
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (!file) return
-    await sendFileMessage(senderId, file)
+    if (!file || sending) return
+
+    console.log('[Chat] 发送附件', file)
+
     e.target.value = ''
-    await loadMessages()
+    setSending(true)
+
+    const tempId = 'local-file-' + Date.now()
+    const tempMsg: Message = {
+      _id: tempId as any,
+      senderId,
+      type: file.type.startsWith('video') ? 'video' : 'image',
+      content: '',
+      // 提前展示一张“本地预览”其实也可以，这里先简单处理
+      createdAt: new Date().toISOString()
+    } as Message
+
+    setMessages(prev => [...prev, tempMsg])
+    setTimeout(scrollToBottom, 50)
+
+    try {
+      await sendFileMessage(senderId, file)
+      console.log('[Chat] 附件发送成功')
+      await loadMessages()
+    } catch (err) {
+      console.error('[Chat] 附件发送失败', err)
+      setMessages(prev => prev.filter(m => m._id !== tempId))
+      alert('附件发送失败，请检查网络或后端配置')
+    } finally {
+      setSending(false)
+    }
   }
 
   useEffect(() => {
@@ -62,6 +126,7 @@ const ChatPage: React.FC = () => {
 
   return (
     <div style={styles.page}>
+      {/* 顶部标题栏 */}
       <div style={styles.header}>
         <span>Lover&apos;s Secret</span>
         <select
@@ -74,6 +139,7 @@ const ChatPage: React.FC = () => {
         </select>
       </div>
 
+      {/* 消息列表 */}
       <div style={styles.messages}>
         {loading && messages.length === 0 && (
           <div style={styles.system}>正在加载聊天记录...</div>
@@ -123,6 +189,7 @@ const ChatPage: React.FC = () => {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* 底部输入栏 - 固定在导航栏上方 */}
       <div style={styles.inputBar}>
         <input
           type="file"
@@ -139,7 +206,14 @@ const ChatPage: React.FC = () => {
           placeholder="说点什么..."
         />
 
-        <button style={styles.sendBtn} onClick={handleSend}>
+        <button
+          style={{
+            ...styles.sendBtn,
+            opacity: sending || !input.trim() ? 0.6 : 1
+          }}
+          onClick={handleSend}
+          disabled={sending || !input.trim()}
+        >
           发送
         </button>
       </div>
@@ -147,16 +221,11 @@ const ChatPage: React.FC = () => {
   )
 }
 
-// 底部导航栏的高度（你那排“聊天/纪念日/朋友圈/相册/设置”大概有多高）
-// 不够可以之后调成 70、80
-const NAV_HEIGHT = 60  // 底部导航大概高度，之后可以微调
-
 const styles: { [k: string]: React.CSSProperties } = {
   page: {
     position: 'relative',
     minHeight: '100vh',
-    // 为“聊天输入栏 + 底部导航栏”预留空间，避免聊天内容被压住
-    paddingBottom: NAV_HEIGHT + 56,
+    paddingBottom: NAV_HEIGHT + 56, // 输入栏 + 底部导航预留空间
     background: '#f5f5f7',
     color: '#333',
     fontFamily: 'system-ui,-apple-system,BlinkMacSystemFont',
@@ -182,7 +251,6 @@ const styles: { [k: string]: React.CSSProperties } = {
     padding: '10px 12px',
     background: '#f5f5f7',
     overflowY: 'auto',
-    // 聊天内容区域高度 = 屏幕高度 - 导航栏高度 - 输入栏高度（约 56px）
     maxHeight: `calc(100vh - ${NAV_HEIGHT + 56}px)`
   },
   msgRow: {
@@ -212,19 +280,17 @@ const styles: { [k: string]: React.CSSProperties } = {
     marginTop: 12
   },
   inputBar: {
-    // 关键：固定在视口底部，而不是跟着内容流动
     position: 'fixed',
     left: 0,
     right: 0,
-    // 放在“底部导航栏上面”
-    bottom: NAV_HEIGHT,
+    bottom: NAV_HEIGHT, // 放在底部导航上面
     padding: '8px 10px',
     borderTop: '1px solid #e5e5e5',
     display: 'flex',
     gap: 6,
     alignItems: 'center',
     background: '#ffffff',
-    zIndex: 10,        // 保证不被其他元素盖住
+    zIndex: 10,
     boxSizing: 'border-box'
   },
   fileInput: {
@@ -252,7 +318,5 @@ const styles: { [k: string]: React.CSSProperties } = {
     whiteSpace: 'nowrap'
   }
 }
-
-
 
 export default ChatPage
