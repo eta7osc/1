@@ -14,11 +14,20 @@ ReactDOM.createRoot(rootElement).render(
   </React.StrictMode>
 )
 
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  window.addEventListener('load', () => {
-    const swUrl = `${import.meta.env.BASE_URL}sw.js`
-    navigator.serviceWorker.register(swUrl).catch(err => {
-      console.log('[SW] registration failed:', err)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    registrations.forEach(registration => {
+      registration.unregister().catch(() => {})
     })
+  })
+}
+
+if ('caches' in window) {
+  caches.keys().then(keys => {
+    keys
+      .filter(key => key.startsWith('lovers-secret-'))
+      .forEach(key => {
+        caches.delete(key).catch(() => {})
+      })
   })
 }
