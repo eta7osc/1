@@ -1,118 +1,84 @@
-import React, { useState, useEffect } from 'react';
-import { Lock, Delete, ArrowRight } from 'lucide-react';
-import { storage } from '../services/storageService';
-import { STORAGE_KEYS } from '../constants';
+﻿import React, { useEffect, useState } from 'react'
+import { ArrowRight, Delete, Lock } from 'lucide-react'
+import { STORAGE_KEYS } from '../constants'
+import { storage } from '../services/storageService'
 
 interface PasscodeLockProps {
-  onSuccess: () => void;
+  onSuccess: () => void
 }
 
+const MIN_PASSCODE_LENGTH = 4
+
 const PasscodeLock: React.FC<PasscodeLockProps> = ({ onSuccess }) => {
-  const [passcode, setPasscode] = useState<string>('');
-  const [savedPasscode, setSavedPasscode] = useState<string | null>(null);
-  const [mode, setMode] = useState<'login' | 'setup' | 'verify'>('login');
-  const [error, setError] = useState<string>('');
+  const [passcode, setPasscode] = useState('')
+  const [savedPasscode, setSavedPasscode] = useState<string | null>(null)
+  const [mode, setMode] = useState<'login' | 'setup'>('login')
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    const stored = storage.get<string | null>(STORAGE_KEYS.PASSCODE, null);
-    if (!stored) {
-      setMode('setup');
+    const stored = storage.get<string | null>(STORAGE_KEYS.PASSCODE, null)
+    if (stored) {
+      setSavedPasscode(stored)
+      setMode('login')
     } else {
-      setSavedPasscode(stored);
-      setMode('login');
+      setMode('setup')
     }
-  }, []);
+  }, [])
 
   const handleInput = (char: string) => {
-    if (passcode.length < 12) {
-      setPasscode(prev => prev + char);
-      setError('');
+    if (passcode.length >= 12) {
+      return
     }
-  };
+
+    setPasscode(prev => prev + char)
+    if (error) {
+      setError('')
+    }
+  }
 
   const handleBackspace = () => {
-    setPasscode(prev => prev.slice(0, -1));
-  };
+    setPasscode(prev => prev.slice(0, -1))
+  }
 
   const handleSubmit = () => {
     if (mode === 'login') {
       if (passcode === savedPasscode) {
-        onSuccess();
+        onSuccess()
       } else {
-        setError('密码错误，请重试');
-        setPasscode('');
+        setError('密码错误，请重试')
+        setPasscode('')
       }
-    } else if (mode === 'setup') {
-      if (passcode.length >= 4) {
-        storage.set(STORAGE_KEYS.PASSCODE, passcode);
-        onSuccess();
-      } else {
-        setError('密码长度至少4位');
-      }
+      return
     }
-  };
 
-  const renderKeypad = () => {
-    const rows = [
-      ['1', '2', '3'],
-      ['4', '5', '6'],
-      ['7', '8', '9'],
-      ['A', '0', 'B'],
-    ];
+    if (passcode.length < MIN_PASSCODE_LENGTH) {
+      setError(`密码长度至少 ${MIN_PASSCODE_LENGTH} 位`)
+      return
+    }
 
-    return (
-      <div className="grid grid-cols-3 gap-6 mt-12 w-full max-w-xs mx-auto">
-        {rows.flat().map((key) => (
-          <button
-            key={key}
-            onClick={() => handleInput(key)}
-            className="w-16 h-16 rounded-full ios-blur flex items-center justify-center text-2xl font-medium active:bg-gray-300 transition-colors"
-          >
-            {key}
-          </button>
-        ))}
-        <div />
-        <button
-          onClick={handleBackspace}
-          className="w-16 h-16 rounded-full flex items-center justify-center text-gray-500 active:text-black"
-        >
-          <Delete size={24} />
-        </button>
-        <button
-          onClick={handleSubmit}
-          className="w-16 h-16 rounded-full bg-pink-500 text-white flex items-center justify-center active:bg-pink-600 shadow-lg"
-        >
-          <ArrowRight size={28} />
-        </button>
-      </div>
-    );
-  };
+    storage.set(STORAGE_KEYS.PASSCODE, passcode)
+    onSuccess()
+  }
+
+  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', '0', 'B']
 
   return (
     <div
       className="fixed inset-0 z-[100] bg-white flex flex-col items-center px-8 text-center overflow-y-auto"
       style={{
-        // 顶部：系统安全区 + 额外 40px 间距，避免被刘海/灵动岛挡住
         paddingTop: 'calc(env(safe-area-inset-top) + 40px)',
-        // 底部：给将来底部导航 / 手势条留一点空间
-        paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)',
+        paddingBottom: 'calc(env(safe-area-inset-bottom) + 24px)'
       }}
     >
       <div className="mb-8 p-6 bg-pink-50 rounded-full">
         <Lock size={48} className="text-pink-500" />
       </div>
 
-      <h1 className="text-2xl font-bold mb-2">
-        {mode === 'login' ? '输入访问密码' : '设置私密密码'}
-      </h1>
-      <p className="text-gray-500 mb-8">
-        {mode === 'login'
-          ? '只有我们可以进入的空间'
-          : '设置一个仅属于我们的数字字母组合密码'}
-      </p >
+      <h1 className="text-2xl font-bold mb-2">{mode === 'login' ? '输入访问密码' : '设置访问密码'}</h1>
+      <p className="text-gray-500 mb-8">{mode === 'login' ? '只有你们可以进入这个空间' : '使用数字和字母组合，增强安全性'}</p>
 
       <div className="flex gap-3 justify-center mb-4 min-h-[40px]">
-        {Array.from({ length: Math.max(passcode.length, 4) }).map((_, i) => (
+        {Array.from({ length: Math.max(passcode.length, MIN_PASSCODE_LENGTH) }).map((_, i) => (
           <div
             key={i}
             className={`w-4 h-4 rounded-full border-2 border-pink-500 transition-all ${
@@ -122,21 +88,43 @@ const PasscodeLock: React.FC<PasscodeLockProps> = ({ onSuccess }) => {
         ))}
       </div>
 
-      {error && (
-        <p className="text-red-500 text-sm animate__animated animate__shakeX">
-          {error}
-        </p >
-      )}
+      {error && <p className="text-red-500 text-sm animate__animated animate__shakeX">{error}</p>}
 
-      {renderKeypad()}
+      <div className="grid grid-cols-3 gap-6 mt-12 w-full max-w-xs mx-auto">
+        {keys.map(key => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => handleInput(key)}
+            className="w-16 h-16 rounded-full ios-blur flex items-center justify-center text-2xl font-medium active:bg-gray-300 transition-colors"
+          >
+            {key}
+          </button>
+        ))}
+        <div />
+        <button
+          type="button"
+          onClick={handleBackspace}
+          className="w-16 h-16 rounded-full flex items-center justify-center text-gray-500 active:text-black"
+        >
+          <Delete size={24} />
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          className="w-16 h-16 rounded-full bg-pink-500 text-white flex items-center justify-center active:bg-pink-600 shadow-lg"
+        >
+          <ArrowRight size={28} />
+        </button>
+      </div>
 
       <div className="mt-12 mb-4">
-        <button className="text-pink-500 font-medium text-sm">
-          忘记密码？通过私密问题找回
+        <button type="button" className="text-pink-500 font-medium text-sm">
+          忘记密码？可在后续版本通过密保找回
         </button>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default PasscodeLock;
+export default PasscodeLock

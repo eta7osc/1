@@ -1,15 +1,9 @@
-// pages/ChatPage.tsx
-import React, { useEffect, useRef, useState } from 'react'
-import {
-  fetchMessages,
-  sendFileMessage,
-  sendTextMessage,
-  Message,
-  Sender
-} from '../services/chatService'
+﻿import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { fetchMessages, Message, sendFileMessage, sendTextMessage, Sender } from '../services/chatService'
 
-// 底部导航栏（“聊天 / 纪念日 / 朋友圈 / 相册 / 设置”）的大致高度
 const NAV_HEIGHT = 60
+const INPUT_BAR_HEIGHT = 56
+const POLL_INTERVAL_MS = 5000
 
 const ChatPage: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([])
@@ -17,64 +11,159 @@ const ChatPage: React.FC = () => {
   const [senderId, setSenderId] = useState<Sender>('me')
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
+  const [error, setError] = useState('')
+
+  const isLoadingRef = useRef(false)
+  const pollTimerRef = useRef<number | null>(null)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
     }
-  }
+  }, [])
 
-  const loadMessages = async () => {
+  const loadMessages = useCallback(async (showLoading = false) => {
+    if (isLoadingRef.current) {
+      return
+    }
+
     try {
-      setLoading(true)
+      isLoadingRef.current = true
+      if (showLoading) {
+        setLoading(true)
+      }
+
       const data = await fetchMessages()
       setMessages(data)
-      setTimeout(scrollToBottom, 100)
+      setError('')
     } catch (err) {
-      console.error('加载消息失败', err)
+      console.error('[Chat] load messages failed', err)
+      setError('消息加载失败，请检查网络或云开发配置')
     } finally {
-      setLoading(false)
+      isLoadingRef.current = false
+      if (showLoading) {
+        setLoading(false)
+      }
     }
-  }
+  }, [])
 
-  const handleSend = async () => {
+  const startPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      window.clearInterval(pollTimerRef.current)
+    }
+
+    pollTimerRef.current = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        loadMessages(false)
+      }
+    }, POLL_INTERVAL_MS)
+  }, [loadMessages])
+
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      window.clearInterval(pollTimerRef.current)
+      pollTimerRef.current = null
+    }
+  }, [])
+
+  const handleSend = useCallback(async () => {
     const text = input.trim()
-    if (!text || sending) return
+    if (!text || sending) {
+      return
+    }
 
-    console.log('[Chat] 点击发送按钮, text =', text, 'senderId =', senderId)
-
-    // 先清空输入框，让用户感觉“发出去了”
     setInput('')
     setSending(true)
+    setError('')
 
-    // 构造一条“本地临时消息”，先插到列表里（乐观更新）
-    const tempId = 'local-' + Date.now()
+    const tempId = `local-${Date.now()}`
     const tempMsg: Message = {
-      _id: tempId as any,
+      _id: tempId,
+      roomId: 'couple-room',
       senderId,
       type: 'text',
       content: text,
       createdAt: new Date().toISOString()
-    } as Message
+    }
 
     setMessages(prev => [...prev, tempMsg])
-    setTimeout(scrollToBottom, 50)
 
     try {
       await sendTextMessage(senderId, text)
-      console.log('[Chat] 发送成功，即将重新拉取列表')
-      await loadMessages()
+      await loadMessages(false)
     } catch (err) {
-      console.error('[Chat] 发送失败', err)
-      // 回滚临时消息 + 把内容放回输入框
-      setMessages(prev => prev.filter(m => m._id !== tempId))
+      console.error('[Chat] send text failed', err)
+      setMessages(prev => prev.filter(message => message._id !== tempId))
       setInput(text)
-      alert('消息发送失败，请检查网络或后端配置（CloudBase / API）')
+      setError('发送失败，请稍后重试')
     } finally {
       setSending(false)
     }
-  }
+  }, [input, loadMessages, senderId, sending])
+
+  const handleFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      e.target.value = ''
+
+      if (!file || sending) {
+        return
+      }
+
+      setSending(true)
+      setError('')
+
+      const tempId = `local-file-${Date.now()}`
+      const tempMsg: Message = {
+        _id: tempId,
+        roomId: 'couple-room',
+        senderId,
+        type: file.type.startsWith('video') ? 'video' : 'image',
+        content: '',
+        createdAt: new Date().toISOString()
+      }
+
+      setMessages(prev => [...prev, tempMsg])
+
+      try {
+        await sendFileMessage(senderId, file)
+        await loadMessages(false)
+      } catch (err) {
+        console.error('[Chat] send file failed', err)
+        setMessages(prev => prev.filter(message => message._id !== tempId))
+        setError(err instanceof Error ? err.message : '附件发送失败，请稍后重试')
+      } finally {
+        setSending(false)
+      }
+    },
+    [loadMessages, senderId, sending]
+  )
+
+  useEffect(() => {
+    loadMessages(true)
+    startPolling()
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadMessages(false)
+        startPolling()
+      } else {
+        stopPolling()
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      stopPolling()
+    }
+  }, [loadMessages, startPolling, stopPolling])
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, scrollToBottom])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -83,120 +172,57 @@ const ChatPage: React.FC = () => {
     }
   }
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || sending) return
-
-    console.log('[Chat] 发送附件', file)
-
-    e.target.value = ''
-    setSending(true)
-
-    const tempId = 'local-file-' + Date.now()
-    const tempMsg: Message = {
-      _id: tempId as any,
-      senderId,
-      type: file.type.startsWith('video') ? 'video' : 'image',
-      content: '',
-      // 提前展示一张“本地预览”其实也可以，这里先简单处理
-      createdAt: new Date().toISOString()
-    } as Message
-
-    setMessages(prev => [...prev, tempMsg])
-    setTimeout(scrollToBottom, 50)
-
-    try {
-      await sendFileMessage(senderId, file)
-      console.log('[Chat] 附件发送成功')
-      await loadMessages()
-    } catch (err) {
-      console.error('[Chat] 附件发送失败', err)
-      setMessages(prev => prev.filter(m => m._id !== tempId))
-      alert('附件发送失败，请检查网络或后端配置')
-    } finally {
-      setSending(false)
-    }
-  }
-
-  useEffect(() => {
-    loadMessages()
-    const timer = setInterval(loadMessages, 3000)
-    return () => clearInterval(timer)
-  }, [])
-
   return (
     <div style={styles.page}>
-      {/* 顶部标题栏 */}
       <div style={styles.header}>
         <span>Lover&apos;s Secret</span>
         <select
           value={senderId}
           onChange={e => setSenderId(e.target.value as Sender)}
           style={styles.select}
+          disabled={sending}
         >
           <option value="me">我</option>
           <option value="her">她</option>
         </select>
       </div>
 
-      {/* 消息列表 */}
       <div style={styles.messages}>
-        {loading && messages.length === 0 && (
-          <div style={styles.system}>正在加载聊天记录...</div>
-        )}
+        {loading && messages.length === 0 && <div style={styles.system}>正在加载聊天记录...</div>}
+        {!loading && messages.length === 0 && <div style={styles.system}>还没有消息，发一条试试</div>}
 
-        {messages.map(m => (
+        {messages.map(message => (
           <div
-            key={m._id}
+            key={message._id}
             style={{
               ...styles.msgRow,
-              justifyContent: m.senderId === 'me' ? 'flex-end' : 'flex-start'
+              justifyContent: message.senderId === 'me' ? 'flex-end' : 'flex-start'
             }}
           >
             <div
               style={{
                 ...styles.msgBubble,
-                backgroundColor: m.senderId === 'me' ? '#ff5a79' : '#3a3a3a'
+                backgroundColor: message.senderId === 'me' ? '#ff5a79' : '#3a3a3a'
               }}
             >
-              {m.type === 'text' && <div>{m.content}</div>}
-
-              {m.type === 'image' && m.url && (
-                <img
-                  src={m.url}
-                  alt="img"
-                  style={{ maxWidth: 220, borderRadius: 8 }}
-                />
+              {message.type === 'text' && <div>{message.content}</div>}
+              {message.type === 'image' && message.url && <img src={message.url} alt="image" style={styles.image} />}
+              {message.type === 'video' && message.url && <video src={message.url} controls style={styles.video} />}
+              {(message.type === 'image' || message.type === 'video') && !message.url && (
+                <div style={styles.pendingFile}>上传中...</div>
               )}
 
-              {m.type === 'video' && m.url && (
-                <video
-                  src={m.url}
-                  controls
-                  style={{ maxWidth: 260, borderRadius: 8 }}
-                />
-              )}
-
-              <div style={styles.time}>
-                {m.createdAt
-                  ? new Date(m.createdAt).toLocaleString()
-                  : ''}
-              </div>
+              <div style={styles.time}>{message.createdAt ? new Date(message.createdAt).toLocaleString() : ''}</div>
             </div>
           </div>
         ))}
 
+        {error && <div style={styles.error}>{error}</div>}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 底部输入栏 - 固定在导航栏上方 */}
       <div style={styles.inputBar}>
-        <input
-          type="file"
-          accept="image/*,video/*"
-          onChange={handleFileChange}
-          style={styles.fileInput}
-        />
+        <input type="file" accept="image/*,video/*" onChange={handleFileChange} style={styles.fileInput} disabled={sending} />
 
         <input
           style={styles.textInput}
@@ -204,6 +230,7 @@ const ChatPage: React.FC = () => {
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="说点什么..."
+          disabled={sending}
         />
 
         <button
@@ -213,6 +240,7 @@ const ChatPage: React.FC = () => {
           }}
           onClick={handleSend}
           disabled={sending || !input.trim()}
+          type="button"
         >
           发送
         </button>
@@ -221,11 +249,11 @@ const ChatPage: React.FC = () => {
   )
 }
 
-const styles: { [k: string]: React.CSSProperties } = {
+const styles: Record<string, React.CSSProperties> = {
   page: {
     position: 'relative',
     minHeight: '100vh',
-    paddingBottom: NAV_HEIGHT + 56, // 输入栏 + 底部导航预留空间
+    paddingBottom: NAV_HEIGHT + INPUT_BAR_HEIGHT,
     background: '#f5f5f7',
     color: '#333',
     fontFamily: 'system-ui,-apple-system,BlinkMacSystemFont',
@@ -251,25 +279,38 @@ const styles: { [k: string]: React.CSSProperties } = {
     padding: '10px 12px',
     background: '#f5f5f7',
     overflowY: 'auto',
-    maxHeight: `calc(100vh - ${NAV_HEIGHT + 56}px)`
+    maxHeight: `calc(100vh - ${NAV_HEIGHT + INPUT_BAR_HEIGHT}px)`
   },
   msgRow: {
     display: 'flex',
     marginBottom: 8
   },
   msgBubble: {
-    maxWidth: '70%',
+    maxWidth: '72%',
     padding: '8px 10px',
     borderRadius: 16,
     display: 'flex',
     flexDirection: 'column',
     gap: 4,
+    color: '#fff',
     backgroundColor: '#ffffff',
     boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
   },
+  image: {
+    maxWidth: 220,
+    borderRadius: 8
+  },
+  video: {
+    maxWidth: 260,
+    borderRadius: 8
+  },
+  pendingFile: {
+    fontSize: 12,
+    opacity: 0.85
+  },
   time: {
     fontSize: 10,
-    opacity: 0.6,
+    opacity: 0.7,
     marginTop: 4,
     alignSelf: 'flex-end'
   },
@@ -279,11 +320,17 @@ const styles: { [k: string]: React.CSSProperties } = {
     fontSize: 12,
     marginTop: 12
   },
+  error: {
+    marginTop: 10,
+    textAlign: 'center',
+    color: '#d93c3c',
+    fontSize: 12
+  },
   inputBar: {
     position: 'fixed',
     left: 0,
     right: 0,
-    bottom: NAV_HEIGHT, // 放在底部导航上面
+    bottom: NAV_HEIGHT,
     padding: '8px 10px',
     borderTop: '1px solid #e5e5e5',
     display: 'flex',
@@ -294,7 +341,8 @@ const styles: { [k: string]: React.CSSProperties } = {
     boxSizing: 'border-box'
   },
   fileInput: {
-    flexShrink: 0
+    flexShrink: 0,
+    maxWidth: 100
   },
   textInput: {
     flex: 1,

@@ -1,26 +1,24 @@
-// services/cloudbaseClient.ts
-import cloudbase from '@cloudbase/js-sdk'
+﻿import cloudbase from '@cloudbase/js-sdk'
 
-// 你的 CloudBase 环境 ID
-const envId = 'lover-secret-9gdyk6cfbb4f313c'
+const envId = import.meta.env.VITE_CLOUDBASE_ENV_ID
+
+if (!envId) {
+  // Help fail fast when env is missing in deployment.
+  console.warn('[CloudBase] Missing VITE_CLOUDBASE_ENV_ID, CloudBase calls will fail until it is configured.')
+}
 
 export const app = cloudbase.init({
-  env: envId
+  env: envId || ''
 })
 
-// 使用本地持久化保存登录态
 export const auth = app.auth({ persistence: 'local' })
 
-// 确保当前有登录态（匿名登录，兼容新版 SDK）
 export async function ensureLogin() {
-  // 1. 先看看有没有已有登录态
-  let loginState = await auth.getLoginState()
-
-  // 2. 没有的话就走匿名登录
-  if (!loginState) {
-    const res = await auth.signInAnonymously()
-    loginState = res.loginState
+  const loginState = await auth.getLoginState()
+  if (loginState) {
+    return loginState
   }
 
-  return loginState
+  const res = await auth.signInAnonymously()
+  return res.loginState
 }
