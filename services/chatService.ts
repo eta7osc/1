@@ -143,7 +143,7 @@ async function uploadMediaFile(file: File, folder: string) {
   const ext = file.name.split('.').pop() || 'bin'
   const cloudPath = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
 
-  const uploadRes = await storage.uploadFile({ cloudPath, file })
+  const uploadRes = await storage.uploadFile({ cloudPath, filePath: file as any })
   return String(uploadRes.fileID)
 }
 
