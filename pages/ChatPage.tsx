@@ -311,8 +311,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
   const activeMessages = useMemo(() => messages.filter(message => !isMessageDestroyed(message, nowMs)), [messages, nowMs])
 
   return (
-    <div className="ios-page h-full min-h-full flex flex-col">
-      <header className="ios-blur ios-safe-top px-4 pb-3 border-b border-white/70">
+    <div className="ios-page h-full min-h-0 flex flex-col">
+      <header className="ios-blur ios-safe-top px-4 pb-3 border-b border-white/70 shrink-0">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="ios-title text-xl">Lover&apos;s Secret</h1>
@@ -331,7 +331,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
         </div>
       </header>
 
-      <main className="flex-1 ios-scroll px-3 py-3 space-y-2 ios-chat-bg">
+      <main className="flex-1 min-h-0 ios-scroll px-3 py-3 space-y-2 ios-chat-bg">
         {loading && activeMessages.length === 0 && <div className="text-center text-xs text-gray-400">正在加载聊天记录...</div>}
         {!loading && activeMessages.length === 0 && <div className="text-center text-xs text-gray-400">还没有消息，发一条试试</div>}
 
@@ -410,7 +410,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
       </main>
 
       {showEmojiPanel && (
-        <section className="border-t border-rose-100 bg-white/95 px-3 py-2 max-h-52 ios-scroll">
+        <section className="border-t border-rose-100 bg-white/95 px-3 py-2 max-h-52 ios-scroll shrink-0">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold text-gray-600">爱的表情包</h3>
             <button type="button" className="text-xs text-rose-500" onClick={() => emojiUploadRef.current?.click()}>
@@ -434,7 +434,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel }) 
         </section>
       )}
 
-      <footer className="ios-blur ios-safe-bottom border-t border-white/80 px-3 py-2 space-y-2">
+      <footer className="ios-blur ios-safe-bottom border-t border-white/80 px-3 py-2 space-y-2 shrink-0">
         <div className="flex items-center gap-2 text-xs text-gray-600">
           <button
             type="button"

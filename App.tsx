@@ -226,16 +226,18 @@ const AppContent: React.FC = () => {
       </div>
 
       <div className="ios-app-frame ios-page flex min-h-screen flex-col overflow-hidden relative z-10">
-        <main className="flex-1 overflow-hidden">
+        <main className="flex-1 min-h-0 overflow-hidden flex">
           <Suspense fallback={<div className="h-full flex items-center justify-center text-gray-500">加载中...</div>}>
-            <Routes>
-              <Route path="/" element={<ChatPage currentSender={account.role} currentUserLabel={account.nickname} />} />
-              <Route path="/anniversary" element={<AnniversaryPage currentSender={account.role} />} />
-              <Route path="/home" element={<HomePage currentSender={account.role} />} />
-              <Route path="/moments" element={<Navigate to="/home" replace />} />
-              <Route path="/photos" element={<PhotoWallPage currentSender={account.role} />} />
-              <Route path="/settings" element={settingsPage} />
-            </Routes>
+            <div className="flex-1 min-h-0">
+              <Routes>
+                <Route path="/" element={<ChatPage currentSender={account.role} currentUserLabel={account.nickname} />} />
+                <Route path="/anniversary" element={<AnniversaryPage currentSender={account.role} />} />
+                <Route path="/home" element={<HomePage currentSender={account.role} />} />
+                <Route path="/moments" element={<Navigate to="/home" replace />} />
+                <Route path="/photos" element={<PhotoWallPage currentSender={account.role} />} />
+                <Route path="/settings" element={settingsPage} />
+              </Routes>
+            </div>
           </Suspense>
         </main>
         <TabBar />
