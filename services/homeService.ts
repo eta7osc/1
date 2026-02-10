@@ -4,6 +4,8 @@ import type { Sender } from './chatService'
 const ROOM_ID = 'couple-room'
 const COLLECTION = 'home_posts'
 const MAX_MEDIA_SIZE = 300 * 1024 * 1024
+const MAX_IMAGE_COUNT = 9
+const MAX_VIDEO_COUNT = 1
 
 export interface HomeComment {
   id: string
@@ -80,11 +82,11 @@ function normalizePost(raw: any): HomePost {
 function assertMediaFile(file: File) {
   const isAllowed = file.type.startsWith('image/') || file.type.startsWith('video/')
   if (!isAllowed) {
-    throw new Error('º““≥√ÊΩˆ÷ß≥÷Õº∆¨∫Õ ”∆µ')
+    throw new Error('ÂÆ∂È°µÈù¢‰ªÖÊîØÊåÅÂõæÁâáÂíåËßÜÈ¢ë')
   }
 
   if (file.size > MAX_MEDIA_SIZE) {
-    throw new Error('Œƒº˛π˝¥Û£¨º““≥√Êµ•Œƒº˛◊Ó¥Û 300MB')
+    throw new Error('Êñá‰ª∂ËøáÂ§ßÔºåÂÆ∂È°µÈù¢ÂçïÊñá‰ª∂ÊúÄÂ§ß 300MB')
   }
 }
 
@@ -143,7 +145,19 @@ export async function createHomePost(authorId: Sender, content: string, files: F
   const text = content.trim()
 
   if (!text && files.length === 0) {
-    throw new Error('«Î ‰»Îƒ⁄»›ªÚ…œ¥´Õº∆¨/ ”∆µ')
+    throw new Error('ËØ∑ËæìÂÖ•ÂÜÖÂÆπÊàñ‰∏ä‰º†ÂõæÁâá/ËßÜÈ¢ë')
+  }
+
+  const imageCount = files.filter(file => file.type.startsWith('image/')).length
+  const videoCount = files.filter(file => file.type.startsWith('video/')).length
+  if (imageCount > MAX_IMAGE_COUNT) {
+    throw new Error(`ÊúÄÂ§ö‰∏ä‰º† ${MAX_IMAGE_COUNT} Âº†ÂõæÁâá`)
+  }
+  if (videoCount > MAX_VIDEO_COUNT) {
+    throw new Error('ÊúÄÂ§ö‰∏ä‰º† 1 ‰∏™ËßÜÈ¢ë')
+  }
+  if (imageCount > 0 && videoCount > 0) {
+    throw new Error('ÂõæÁâá‰∏éËßÜÈ¢ëËØ∑ÂàÜÂºÄÂèëÂ∏ÉÔºåÊõ¥Êé•ËøëÊúãÂèãÂúà‰ΩìÈ™å')
   }
 
   const media: HomeMedia[] = []
@@ -170,7 +184,7 @@ export async function toggleHomeLike(postId: string, actor: Sender) {
   const res = await db.collection(COLLECTION).doc(postId).get()
   const row = res.data?.[0] as any
   if (!row) {
-    throw new Error('∂ØÃ¨≤ª¥Ê‘⁄')
+    throw new Error('Âä®ÊÄÅ‰∏çÂ≠òÂú®')
   }
 
   const currentLikes: Sender[] = Array.isArray(row.likes) ? row.likes.map((like: unknown) => (like === 'her' ? 'her' : 'me')) : []
@@ -190,7 +204,7 @@ export async function addHomeComment(postId: string, actor: Sender, content: str
   const res = await db.collection(COLLECTION).doc(postId).get()
   const row = res.data?.[0] as any
   if (!row) {
-    throw new Error('∂ØÃ¨≤ª¥Ê‘⁄')
+    throw new Error('Âä®ÊÄÅ‰∏çÂ≠òÂú®')
   }
 
   const comments = Array.isArray(row.comments) ? row.comments : []
@@ -203,3 +217,4 @@ export async function addHomeComment(postId: string, actor: Sender, content: str
 
   await db.collection(COLLECTION).doc(postId).update({ comments })
 }
+

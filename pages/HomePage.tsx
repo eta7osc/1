@@ -1,5 +1,5 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Heart, MessageCircle, Plus, Send, Sparkles, Video } from 'lucide-react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Heart, Image as ImageIcon, MessageCircle, Plus, Send, Sparkles, Video, X } from 'lucide-react'
 import type { Sender } from '../services/chatService'
 import { addHomeComment, createHomePost, fetchHomePosts, HomePost, toggleHomeLike } from '../services/homeService'
 
@@ -14,9 +14,17 @@ interface DraftFile {
 }
 
 const POLL_INTERVAL_MS = 5000
+const MAX_IMAGE_COUNT = 9
+const MAX_VIDEO_COUNT = 1
 
 function roleLabel(sender: Sender) {
   return sender === 'me' ? '我' : '她'
+}
+
+function getImageGridClass(count: number) {
+  if (count === 1) return 'grid-cols-1'
+  if (count === 2 || count === 4) return 'grid-cols-2'
+  return 'grid-cols-3'
 }
 
 const HomePage: React.FC<HomePageProps> = ({ currentSender }) => {
@@ -30,6 +38,7 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender }) => {
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({})
 
   const draftFilesRef = useRef<DraftFile[]>([])
+  const mediaInputRef = useRef<HTMLInputElement | null>(null)
 
   const cleanupDraftFiles = useCallback((files: DraftFile[]) => {
     files.forEach(item => URL.revokeObjectURL(item.previewUrl))
@@ -83,19 +92,56 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender }) => {
       return
     }
 
+    const currentImages = draftFiles.filter(item => item.type === 'image').length
+    const currentVideos = draftFiles.filter(item => item.type === 'video').length
+    const nextImages = files.filter(file => file.type.startsWith('image/')).length
+    const nextVideos = files.filter(file => file.type.startsWith('video/')).length
+
+    if (nextImages + nextVideos !== files.length) {
+      setError('仅支持图片或视频文件')
+      return
+    }
+
+    if (currentImages + nextImages > MAX_IMAGE_COUNT) {
+      setError(`最多上传 ${MAX_IMAGE_COUNT} 张图片`)
+      return
+    }
+
+    if (currentVideos + nextVideos > MAX_VIDEO_COUNT) {
+      setError('最多上传 1 个视频')
+      return
+    }
+
+    if ((currentImages > 0 || nextImages > 0) && (currentVideos > 0 || nextVideos > 0)) {
+      setError('图片与视频请分开发布')
+      return
+    }
+
     const next = files.map(file => ({
       file,
       previewUrl: URL.createObjectURL(file),
       type: file.type.startsWith('video/') ? 'video' : 'image'
     }))
 
+    setError('')
     setDraftFiles(prev => [...prev, ...next])
+  }
+
+  const handleRemoveDraftFile = (index: number) => {
+    setDraftFiles(prev => {
+      const target = prev[index]
+      if (target) {
+        URL.revokeObjectURL(target.previewUrl)
+      }
+      return prev.filter((_, i) => i !== index)
+    })
   }
 
   const clearComposer = useCallback(() => {
     cleanupDraftFiles(draftFilesRef.current)
     setDraftFiles([])
     setContent('')
+    setError('')
     setShowComposer(false)
   }, [cleanupDraftFiles])
 
@@ -147,9 +193,11 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender }) => {
   }
 
   const headerTitle = useMemo(() => `欢迎回家，${roleLabel(currentSender)}`, [currentSender])
+  const draftImageCount = draftFiles.filter(item => item.type === 'image').length
+  const draftVideoCount = draftFiles.filter(item => item.type === 'video').length
 
   return (
-    <div className="ios-page ios-scroll pb-32 px-4 ios-safe-top space-y-4">
+    <div className="ios-page ios-scroll pb-36 px-4 ios-safe-top space-y-4">
       <div className="ios-card p-4 bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(255,237,244,0.9))]">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -159,7 +207,14 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender }) => {
               <Sparkles size={11} /> 你们的恋爱时间线
             </div>
           </div>
-          <button type="button" className="ios-button-primary px-4 py-2 text-sm" onClick={() => setShowComposer(true)}>
+          <button
+            type="button"
+            className="ios-button-primary px-4 py-2 text-sm"
+            onClick={() => {
+              setError('')
+              setShowComposer(true)
+            }}
+          >
             <span className="inline-flex items-center gap-1">
               <Plus size={16} /> 发布
             </span>
@@ -171,30 +226,41 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender }) => {
       {error && <div className="text-center text-sm text-red-500">{error}</div>}
 
       {!loading && posts.length === 0 && (
-        <div className="ios-card p-5 text-sm text-gray-500 text-center">还没有动态，发布第一条日常吧。</div>
+        <div className="ios-card p-5 text-sm text-gray-500 text-center">还没有动态，发布第一条甜蜜日常吧。</div>
       )}
 
       <div className="space-y-4">
         {posts.map(post => {
           const liked = post.likes.includes(currentSender)
+          const imageMedia = post.media.filter(media => media.type === 'image')
+          const videoMedia = post.media.filter(media => media.type === 'video')
           return (
             <article key={post._id} className="ios-card p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="ios-chip ios-chip-info">{roleLabel(post.authorId)}</div>
                 <span className="text-xs ios-soft-text">{new Date(post.createdAt).toLocaleString()}</span>
               </div>
+              <div className="text-[11px] text-rose-400">仅你们彼此可见</div>
 
               {post.content && <p className="text-[15px] leading-relaxed text-gray-800 whitespace-pre-wrap">{post.content}</p>}
 
-              {post.media.length > 0 && (
-                <div className={`grid gap-2 ${post.media.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                  {post.media.map((media, index) => (
-                    <div key={`${post._id}-${index}`} className="overflow-hidden rounded-2xl bg-black/5">
-                      {media.type === 'video' ? (
-                        <video src={media.url} controls className="w-full max-h-72 object-cover" />
-                      ) : (
-                        <img src={media.url} alt="home-media" className="w-full max-h-72 object-cover" />
-                      )}
+              {imageMedia.length > 0 && (
+                <div className={`grid gap-2 ${getImageGridClass(imageMedia.length)}`}>
+                  {imageMedia.map((media, index) => (
+                    <div
+                      key={`${post._id}-img-${index}`}
+                      className={`overflow-hidden rounded-2xl bg-black/5 ${imageMedia.length === 1 ? 'max-h-96' : 'aspect-square'}`}
+                    >
+                      <img src={media.url} alt="home-media" className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+              )}
+              {videoMedia.length > 0 && (
+                <div className="space-y-2">
+                  {videoMedia.map((media, index) => (
+                    <div key={`${post._id}-video-${index}`} className="overflow-hidden rounded-2xl bg-black/5">
+                      <video src={media.url} controls className="w-full max-h-96 object-cover" />
                     </div>
                   ))}
                 </div>
@@ -214,6 +280,12 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender }) => {
                   {post.comments.length}
                 </span>
               </div>
+              {post.likes.length > 0 && (
+                <div className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-500">
+                  <Heart size={14} className="inline-block mr-1 align-text-bottom fill-rose-400" />
+                  {post.likes.map(roleLabel).join('、')} 觉得很赞
+                </div>
+              )}
 
               <div className="space-y-2">
                 {post.comments.map(comment => (
@@ -245,14 +317,18 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender }) => {
       </div>
 
       {showComposer && (
-        <div className="fixed inset-0 z-50 bg-black/40 p-4 flex items-end">
-          <div className="ios-card w-full p-4 space-y-4 animate__animated animate__slideInUp">
+        <div className="fixed inset-0 z-[120] bg-black/45 p-4 flex items-end">
+          <div
+            className="ios-card w-full p-4 space-y-4 animate__animated animate__slideInUp max-h-[85dvh] overflow-y-auto"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}
+          >
             <div className="flex items-center justify-between">
               <h3 className="ios-title text-lg">发布日常</h3>
               <button type="button" className="text-sm text-gray-500" onClick={clearComposer}>
                 取消
               </button>
             </div>
+            <p className="text-xs text-rose-400">只属于你们的小世界，记录今天的甜蜜瞬间。</p>
 
             <textarea
               className="ios-input px-3 py-2 min-h-24 resize-none"
@@ -270,6 +346,14 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender }) => {
                     ) : (
                       <img src={item.previewUrl} className="w-full h-full object-cover" />
                     )}
+                    <button
+                      type="button"
+                      className="absolute top-1 left-1 h-6 w-6 rounded-full bg-black/55 text-white inline-flex items-center justify-center"
+                      onClick={() => handleRemoveDraftFile(index)}
+                      aria-label="删除媒体"
+                    >
+                      <X size={14} />
+                    </button>
                     {item.type === 'video' && (
                       <span className="absolute top-1 right-1 text-[10px] px-1.5 py-0.5 rounded-full bg-black/50 text-white inline-flex items-center gap-1">
                         <Video size={10} /> 视频
@@ -280,16 +364,24 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender }) => {
               </div>
             )}
 
-            <div className="flex items-center justify-between gap-3">
-              <label className="ios-button-secondary px-4 py-2 text-sm cursor-pointer inline-flex items-center gap-1">
-                <Plus size={16} /> 添加媒体
-                <input type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleSelectFiles} />
-              </label>
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span>图片 {draftImageCount}/{MAX_IMAGE_COUNT}</span>
+              <span>视频 {draftVideoCount}/{MAX_VIDEO_COUNT}</span>
+            </div>
 
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                className="ios-button-secondary px-4 py-2 text-sm inline-flex items-center gap-1"
+                onClick={() => mediaInputRef.current?.click()}
+              >
+                <ImageIcon size={16} /> 添加图片/视频
+              </button>
               <button type="button" onClick={handlePublish} className="ios-button-primary px-5 py-2.5 text-sm" disabled={publishing}>
                 {publishing ? '发布中...' : '发布'}
               </button>
             </div>
+            <input ref={mediaInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleSelectFiles} />
           </div>
         </div>
       )}
@@ -298,3 +390,4 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender }) => {
 }
 
 export default HomePage
+
