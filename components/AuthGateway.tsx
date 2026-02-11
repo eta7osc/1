@@ -25,9 +25,9 @@ const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthed }) => {
 
   const submitText = useMemo(() => {
     if (submitting) {
-      return mode === 'login' ? 'µÇÂ¼ÖĞ...' : '×¢²áÖĞ...'
+      return mode === 'login' ? 'ç™»å½•ä¸­...' : 'æ³¨å†Œä¸­...'
     }
-    return mode === 'login' ? 'Á¢¼´µÇÂ¼' : '×¢²á²¢µÇÂ¼'
+    return mode === 'login' ? 'ç«‹å³ç™»å½•' : 'æ³¨å†Œå¹¶ç™»å½•'
   }, [mode, submitting])
 
   const startCountdown = () => {
@@ -53,10 +53,10 @@ const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthed }) => {
       setError('')
       setHint('')
       const normalizedPhone = await sendPhoneSmsCode(phoneNumber)
-      setHint(`ÑéÖ¤ÂëÒÑ·¢ËÍµ½ ${normalizedPhone}`)
+      setHint(`éªŒè¯ç å·²å‘é€åˆ° ${normalizedPhone}`)
       startCountdown()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'ÑéÖ¤Âë·¢ËÍÊ§°Ü£¬ÇëÉÔºóÖØÊÔ')
+      setError(err instanceof Error ? err.message : 'éªŒè¯ç å‘é€å¤±è´¥ï¼Œè¯·ç¨åé‡è¯•')
     } finally {
       setSendingCode(false)
     }
@@ -76,7 +76,7 @@ const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthed }) => {
 
       onAuthed()
     } catch (err) {
-      setError(err instanceof Error ? err.message : mode === 'login' ? 'µÇÂ¼Ê§°Ü£¬ÇëÉÔºóÖØÊÔ' : '×¢²áÊ§°Ü£¬ÇëÉÔºóÖØÊÔ')
+      setError(err instanceof Error ? err.message : mode === 'login' ? 'ç™»å½•å¤±è´¥ï¼Œè¯·ç¨åé‡è¯•' : 'æ³¨å†Œå¤±è´¥ï¼Œè¯·ç¨åé‡è¯•')
     } finally {
       setSubmitting(false)
     }
@@ -87,22 +87,22 @@ const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthed }) => {
       <div className="auth-grid w-full max-w-4xl">
         <section className="auth-hero ios-card p-6 md:p-9">
           <span className="ios-feature-badge">Lover Security</span>
-          <h1 className="ios-title text-3xl mt-4">¶ÌĞÅÑéÖ¤ÂëµÇÂ¼</h1>
+          <h1 className="ios-title text-3xl mt-4">çŸ­ä¿¡éªŒè¯ç ç™»å½•</h1>
           <p className="ios-soft-text text-sm mt-2 leading-6">
-            ÏÈÍê³ÉÊÖ»úºÅÑéÖ¤£¬ÔÙ½øÈëÄãÃÇµÄË«ÈËË½ÃÜ¿Õ¼ä£¬·ÀÖ¹Ä°ÉúÈËÎóÈë¡£
+            å…ˆå®Œæˆæ‰‹æœºå·éªŒè¯ï¼Œå†è¿›å…¥ä½ ä»¬çš„åŒäººç§å¯†ç©ºé—´ï¼Œé˜²æ­¢é™Œç”Ÿäººè¯¯å…¥ã€‚
           </p>
           <div className="auth-feature-list mt-6">
             <div className="auth-feature-item">
               <ShieldCheck size={18} />
-              <span>ÕËºÅÉí·İ¿ÉĞÅ£¬Éè±¸¿É×·×Ù</span>
+              <span>è´¦å·èº«ä»½å¯ä¿¡ï¼Œè®¾å¤‡å¯è¿½è¸ª</span>
             </div>
             <div className="auth-feature-item">
               <MessageSquareText size={18} />
-              <span>¶ÌĞÅĞ£Ñé£¬Ö§³ÖÃÜÂë¶µµ×µÇÂ¼</span>
+              <span>çŸ­ä¿¡æ ¡éªŒï¼Œæ”¯æŒå¯†ç å…œåº•ç™»å½•</span>
             </div>
             <div className="auth-feature-item">
               <KeyRound size={18} />
-              <span>µÇÂ¼ºóÔÙ½øÈëÓ¦ÓÃÄÚÊÖÊÆËø</span>
+              <span>ç™»å½•åå†è¿›å…¥åº”ç”¨å†…æ‰‹åŠ¿é”</span>
             </div>
           </div>
         </section>
@@ -110,20 +110,20 @@ const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthed }) => {
         <section className="ios-card p-6 md:p-8 auth-panel">
           <div className="ios-segment w-full">
             <button type="button" className={mode === 'login' ? 'is-active flex-1' : 'flex-1'} onClick={() => setMode('login')}>
-              µÇÂ¼
+              ç™»å½•
             </button>
             <button type="button" className={mode === 'register' ? 'is-active flex-1' : 'flex-1'} onClick={() => setMode('register')}>
-              ×¢²á
+              æ³¨å†Œ
             </button>
           </div>
 
           <div className="mt-5 space-y-2">
-            <label className="text-xs text-gray-500">ÊÖ»úºÅ</label>
+            <label className="text-xs text-gray-500">æ‰‹æœºå·</label>
             <div className="auth-input-wrap">
               <Smartphone size={16} />
               <input
                 className="ios-input px-3 py-2.5"
-                placeholder="ÇëÊäÈëÊÖ»úºÅ£¨Ö§³Ö +86£©"
+                placeholder="è¯·è¾“å…¥æ‰‹æœºå·ï¼ˆæ”¯æŒ +86ï¼‰"
                 value={phoneNumber}
                 onChange={e => setPhoneNumber(e.target.value)}
                 inputMode="tel"
@@ -133,11 +133,11 @@ const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthed }) => {
           </div>
 
           <div className="mt-4 space-y-2">
-            <label className="text-xs text-gray-500">¶ÌĞÅÑéÖ¤Âë</label>
+            <label className="text-xs text-gray-500">çŸ­ä¿¡éªŒè¯ç </label>
             <div className="flex items-center gap-2">
               <input
                 className="ios-input px-3 py-2.5"
-                placeholder="4-8 Î»ÑéÖ¤Âë"
+                placeholder="4-8 ä½éªŒè¯ç "
                 value={phoneCode}
                 onChange={e => setPhoneCode(e.target.value)}
                 inputMode="numeric"
@@ -148,18 +148,18 @@ const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthed }) => {
                 disabled={!canSendCode}
                 className="ios-button-secondary px-3 py-2 text-sm whitespace-nowrap disabled:opacity-60"
               >
-                {sendingCode ? '·¢ËÍÖĞ...' : countdown > 0 ? `${countdown}s` : '»ñÈ¡ÑéÖ¤Âë'}
+                {sendingCode ? 'å‘é€ä¸­...' : countdown > 0 ? `${countdown}s` : 'è·å–éªŒè¯ç '}
               </button>
             </div>
           </div>
 
           <div className="mt-4 space-y-2">
-            <label className="text-xs text-gray-500">{mode === 'login' ? 'ÃÜÂë£¨¿ÉÑ¡£©' : 'ÃÜÂë£¨±ØÌî£©'}</label>
+            <label className="text-xs text-gray-500">{mode === 'login' ? 'å¯†ç ï¼ˆå¯é€‰ï¼‰' : 'å¯†ç ï¼ˆå¿…å¡«ï¼‰'}</label>
             <div className="auth-input-wrap">
               <KeyRound size={16} />
               <input
                 className="ios-input px-3 py-2.5"
-                placeholder={mode === 'login' ? 'ÌîÃÜÂë¿É²»ÊäÑéÖ¤Âë' : '8-32 Î»£¬°üº¬×ÖÄ¸ºÍÊı×Ö'}
+                placeholder={mode === 'login' ? 'å¡«å¯†ç å¯ä¸è¾“éªŒè¯ç ' : '8-32 ä½ï¼ŒåŒ…å«å­—æ¯å’Œæ•°å­—'}
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
@@ -180,8 +180,8 @@ const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthed }) => {
 
           <p className="text-xs ios-soft-text mt-4 leading-5">
             {mode === 'login'
-              ? 'µÇÂ¼Ö§³Ö£ºÊÖ»úºÅ + ÑéÖ¤Âë£¬»òÊÖ»úºÅ + ÃÜÂë¡£'
-              : '×¢²áÁ÷³Ì£ºÏÈ»ñÈ¡ÑéÖ¤Âë£¬ÔÙÉèÖÃÃÜÂëÍê³ÉÕËºÅ´´½¨¡£'}
+              ? 'ç™»å½•æ”¯æŒï¼šæ‰‹æœºå· + éªŒè¯ç ï¼Œæˆ–æ‰‹æœºå· + å¯†ç ã€‚'
+              : 'æ³¨å†Œæµç¨‹ï¼šå…ˆè·å–éªŒè¯ç ï¼Œå†è®¾ç½®å¯†ç å®Œæˆè´¦å·åˆ›å»ºã€‚'}
           </p>
         </section>
       </div>

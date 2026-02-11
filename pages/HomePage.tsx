@@ -19,7 +19,7 @@ const MAX_IMAGE_COUNT = 9
 const MAX_VIDEO_COUNT = 1
 
 function roleLabel(sender: Sender) {
-  return sender === 'me' ? 'ÎÒ' : 'Ëı'
+  return sender === 'me' ? 'æˆ‘' : 'å¥¹'
 }
 
 function getImageGridClass(count: number) {
@@ -65,7 +65,7 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
       setError('')
     } catch (err) {
       console.error('[Home] load posts failed', err)
-      setError('¶¯Ì¬¼ÓÔØÊ§°Ü£¬Çë¼ì²éÍøÂç»òÔÆ¿ª·¢ÅäÖÃ')
+      setError('åŠ¨æ€åŠ è½½å¤±è´¥ï¼Œè¯·æ£€æŸ¥ç½‘ç»œæˆ–äº‘å¼€å‘é…ç½®')
     } finally {
       if (withLoading) {
         setLoading(false)
@@ -99,22 +99,22 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
     const nextVideos = files.filter(file => file.type.startsWith('video/')).length
 
     if (nextImages + nextVideos !== files.length) {
-      setError('½öÖ§³ÖÍ¼Æ¬»òÊÓÆµÎÄ¼ş')
+      setError('ä»…æ”¯æŒå›¾ç‰‡æˆ–è§†é¢‘æ–‡ä»¶')
       return
     }
 
     if (currentImages + nextImages > MAX_IMAGE_COUNT) {
-      setError(`×î¶àÉÏ´« ${MAX_IMAGE_COUNT} ÕÅÍ¼Æ¬`)
+      setError(`æœ€å¤šä¸Šä¼  ${MAX_IMAGE_COUNT} å¼ å›¾ç‰‡`)
       return
     }
 
     if (currentVideos + nextVideos > MAX_VIDEO_COUNT) {
-      setError(`×î¶àÉÏ´« ${MAX_VIDEO_COUNT} ¸öÊÓÆµ`)
+      setError(`æœ€å¤šä¸Šä¼  ${MAX_VIDEO_COUNT} ä¸ªè§†é¢‘`)
       return
     }
 
     if ((currentImages > 0 || nextImages > 0) && (currentVideos > 0 || nextVideos > 0)) {
-      setError('Í¼Æ¬ÓëÊÓÆµÇë·Ö¿ª·¢²¼')
+      setError('å›¾ç‰‡ä¸è§†é¢‘è¯·åˆ†å¼€å‘å¸ƒ')
       return
     }
 
@@ -148,7 +148,7 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
 
   const handlePublish = async () => {
     if (!content.trim() && draftFiles.length === 0) {
-      setError('ÇëÊäÈëÄÚÈİ»òÉÏ´«Ã½Ìå')
+      setError('è¯·è¾“å…¥å†…å®¹æˆ–ä¸Šä¼ åª’ä½“')
       return
     }
 
@@ -163,7 +163,7 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
       clearComposer()
       await loadPosts(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '·¢²¼Ê§°Ü£¬ÇëÉÔºóÖØÊÔ')
+      setError(err instanceof Error ? err.message : 'å‘å¸ƒå¤±è´¥ï¼Œè¯·ç¨åé‡è¯•')
     } finally {
       setPublishing(false)
     }
@@ -174,7 +174,7 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
       await toggleHomeLike(postId, currentSender)
       await loadPosts(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'µãÔŞÊ§°Ü')
+      setError(err instanceof Error ? err.message : 'ç‚¹èµå¤±è´¥')
     }
   }
 
@@ -189,11 +189,11 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
       setCommentInputs(prev => ({ ...prev, [postId]: '' }))
       await loadPosts(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'ÆÀÂÛÊ§°Ü')
+      setError(err instanceof Error ? err.message : 'è¯„è®ºå¤±è´¥')
     }
   }
 
-  const headerTitle = useMemo(() => `»¶Ó­»Ø¼Ò£¬${roleLabel(currentSender)}`, [currentSender])
+  const headerTitle = useMemo(() => `æ¬¢è¿å›å®¶ï¼Œ${roleLabel(currentSender)}`, [currentSender])
   const draftImageCount = draftFiles.filter(item => item.type === 'image').length
   const draftVideoCount = draftFiles.filter(item => item.type === 'video').length
 
@@ -202,10 +202,10 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
       <div className="ios-card p-4 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(255,237,244,0.9))]">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="ios-title text-2xl">¼ÒÔ°</h2>
+            <h2 className="ios-title text-2xl">å®¶å›­</h2>
             <p className="text-sm ios-soft-text mt-1">{headerTitle}</p>
             <div className="mt-2 ios-feature-badge">
-              <Sparkles size={11} /> ÄãÃÇµÄÁµ°®Ê±¼äÏß
+              <Sparkles size={11} /> ä½ ä»¬çš„æ‹çˆ±æ—¶é—´çº¿
             </div>
           </div>
           <button
@@ -217,16 +217,16 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
             }}
           >
             <span className="inline-flex items-center gap-1">
-              <Plus size={16} /> ·¢²¼
+              <Plus size={16} /> å‘å¸ƒ
             </span>
           </button>
         </div>
       </div>
 
-      {loading && <div className="text-center text-sm text-gray-400">¼ÓÔØÖĞ...</div>}
+      {loading && <div className="text-center text-sm text-gray-400">åŠ è½½ä¸­...</div>}
       {error && <div className="text-center text-sm text-red-500">{error}</div>}
 
-      {!loading && posts.length === 0 && <div className="ios-card p-5 text-sm text-gray-500 text-center">»¹Ã»ÓĞ¶¯Ì¬£¬·¢²¼µÚÒ»ÌõÌğÃÛÈÕ³£°É¡£</div>}
+      {!loading && posts.length === 0 && <div className="ios-card p-5 text-sm text-gray-500 text-center">è¿˜æ²¡æœ‰åŠ¨æ€ï¼Œå‘å¸ƒç¬¬ä¸€æ¡ç”œèœœæ—¥å¸¸å§ã€‚</div>}
 
       <div className="space-y-3">
         {posts.map(post => {
@@ -247,7 +247,7 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
                 <span className="text-xs ios-soft-text shrink-0">{new Date(post.createdAt).toLocaleString()}</span>
               </div>
 
-              <div className="text-[11px] text-rose-400">½öÄãÃÇ±Ë´Ë¿É¼û</div>
+              <div className="text-[11px] text-rose-400">ä»…ä½ ä»¬å½¼æ­¤å¯è§</div>
               {post.content && <p className="text-[15px] leading-relaxed text-gray-800 whitespace-pre-wrap">{post.content}</p>}
 
               {imageMedia.length > 0 && (
@@ -291,7 +291,7 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
               {post.likes.length > 0 && (
                 <div className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-500">
                   <Heart size={14} className="inline-block mr-1 align-text-bottom fill-rose-400" />
-                  {post.likes.map(roleLabel).join('¡¢')} ¾õµÃºÜÔŞ
+                  {post.likes.map(roleLabel).join('ã€')} è§‰å¾—å¾ˆèµ
                 </div>
               )}
 
@@ -309,7 +309,7 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
                   value={commentInputs[post._id] || ''}
                   onChange={e => setCommentInputs(prev => ({ ...prev, [post._id]: e.target.value }))}
                   className="ios-input px-3 py-2 text-sm"
-                  placeholder="Ğ´ÆÀÂÛ..."
+                  placeholder="å†™è¯„è®º..."
                 />
                 <button type="button" onClick={() => handleSubmitComment(post._id)} className="ios-button-secondary h-10 w-10 flex items-center justify-center">
                   <Send size={15} />
@@ -328,18 +328,18 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
-              <h3 className="ios-title text-lg">·¢²¼ÈÕ³£</h3>
+              <h3 className="ios-title text-lg">å‘å¸ƒæ—¥å¸¸</h3>
               <button type="button" className="text-sm text-gray-500" onClick={clearComposer}>
-                È¡Ïû
+                å–æ¶ˆ
               </button>
             </div>
-            <p className="text-xs text-rose-400">Ö»ÊôÓÚÄãÃÇµÄĞ¡ÊÀ½ç£¬¼ÇÂ¼½ñÌìµÄÌğÃÛË²¼ä¡£</p>
+            <p className="text-xs text-rose-400">åªå±äºä½ ä»¬çš„å°ä¸–ç•Œï¼Œè®°å½•ä»Šå¤©çš„ç”œèœœç¬é—´ã€‚</p>
 
             <textarea
               className="ios-input px-3 py-2 min-h-24 resize-none"
               value={content}
               onChange={e => setContent(e.target.value)}
-              placeholder="¼ÇÂ¼½ñÌìµÄµãµÎ..."
+              placeholder="è®°å½•ä»Šå¤©çš„ç‚¹æ»´..."
             />
 
             {draftFiles.length > 0 && (
@@ -355,13 +355,13 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
                       type="button"
                       className="absolute top-1 left-1 h-6 w-6 rounded-full bg-black/55 text-white inline-flex items-center justify-center"
                       onClick={() => handleRemoveDraftFile(index)}
-                      aria-label="É¾³ıÃ½Ìå"
+                      aria-label="åˆ é™¤åª’ä½“"
                     >
                       <X size={14} />
                     </button>
                     {item.type === 'video' && (
                       <span className="absolute top-1 right-1 text-[10px] px-1.5 py-0.5 rounded-full bg-black/50 text-white inline-flex items-center gap-1">
-                        <Video size={10} /> ÊÓÆµ
+                        <Video size={10} /> è§†é¢‘
                       </span>
                     )}
                   </div>
@@ -370,8 +370,8 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
             )}
 
             <div className="flex items-center justify-between text-xs text-gray-500">
-              <span>Í¼Æ¬ {draftImageCount}/{MAX_IMAGE_COUNT}</span>
-              <span>ÊÓÆµ {draftVideoCount}/{MAX_VIDEO_COUNT}</span>
+              <span>å›¾ç‰‡ {draftImageCount}/{MAX_IMAGE_COUNT}</span>
+              <span>è§†é¢‘ {draftVideoCount}/{MAX_VIDEO_COUNT}</span>
             </div>
 
             <div className="flex items-center justify-between gap-3">
@@ -380,10 +380,10 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
                 className="ios-button-secondary px-4 py-2 text-sm inline-flex items-center gap-1"
                 onClick={() => mediaInputRef.current?.click()}
               >
-                <ImageIcon size={16} /> Ìí¼ÓÍ¼Æ¬/ÊÓÆµ
+                <ImageIcon size={16} /> æ·»åŠ å›¾ç‰‡/è§†é¢‘
               </button>
               <button type="button" onClick={handlePublish} className="ios-button-primary px-5 py-2.5 text-sm" disabled={publishing}>
-                {publishing ? '·¢²¼ÖĞ...' : '·¢²¼'}
+                {publishing ? 'å‘å¸ƒä¸­...' : 'å‘å¸ƒ'}
               </button>
             </div>
 

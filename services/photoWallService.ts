@@ -44,11 +44,11 @@ function normalizeItem(raw: any): WallItem {
 function assertWallFile(file: File) {
   const isAllowed = file.type.startsWith('image/') || file.type.startsWith('video/')
   if (!isAllowed) {
-    throw new Error('��Ƭǽ��֧��ͼƬ����Ƶ')
+    throw new Error('照片墙仅支持图片和视频')
   }
 
   if (file.size > MAX_MEDIA_SIZE) {
-    throw new Error('�ļ�������Ƭǽ���ļ���� 500MB')
+    throw new Error('文件过大，照片墙单文件最大 500MB')
   }
 }
 
