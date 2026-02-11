@@ -291,6 +291,82 @@ select {
   background: linear-gradient(135deg, #ff8fac, #ff5b87);
 }
 
+.auth-scene {
+  background:
+    radial-gradient(circle at 8% 12%, rgba(255, 162, 193, 0.28), rgba(255, 162, 193, 0) 34%),
+    radial-gradient(circle at 88% 82%, rgba(255, 196, 142, 0.34), rgba(255, 196, 142, 0) 36%),
+    linear-gradient(160deg, #fff7f8 0%, #fff2f5 52%, #ffedf3 100%);
+}
+
+.auth-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.auth-hero {
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-hero::after {
+  content: '';
+  position: absolute;
+  width: 210px;
+  height: 210px;
+  right: -52px;
+  top: -88px;
+  background: radial-gradient(circle, rgba(255, 120, 164, 0.24), rgba(255, 120, 164, 0));
+  pointer-events: none;
+}
+
+.auth-feature-list {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-feature-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #4c4958;
+}
+
+.auth-feature-item svg {
+  color: #ff4f7a;
+}
+
+.auth-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+
+.auth-input-wrap {
+  position: relative;
+}
+
+.auth-input-wrap svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #a8a0b7;
+  pointer-events: none;
+}
+
+.auth-input-wrap .ios-input {
+  padding-left: 34px;
+}
+
 @media (min-width: 860px) {
   .ios-app-frame {
     max-width: 460px;
@@ -307,6 +383,12 @@ select {
   .ios-tabbar {
     max-width: 460px;
     margin: 0 auto;
+  }
+
+  .auth-grid {
+    grid-template-columns: 1.05fr 1fr;
+    align-items: stretch;
+    gap: 22px;
   }
 }
 

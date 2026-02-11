@@ -2,6 +2,7 @@
 import { HashRouter as Router, Navigate, NavLink, Route, Routes } from 'react-router-dom'
 import { CalendarClock, Camera, House, MessageCircle, Settings, ShieldCheck, UserCircle2 } from 'lucide-react'
 import PasscodeLock from './components/PasscodeLock'
+import AuthGateway from './components/AuthGateway'
 import {
   AccountProfile,
   CoupleAvatarMap,
@@ -11,6 +12,7 @@ import {
   unbindCurrentAccount,
   updateAccountAvatar
 } from './services/accountService'
+import { isPhoneAuthenticated, signOutPhoneAuth } from './services/authService'
 import type { Sender } from './services/chatService'
 
 const ChatPage = lazy(() => import('./pages/ChatPage'))
@@ -93,10 +95,12 @@ interface SettingsPageProps {
   account: AccountProfile
   onRebind: () => Promise<void>
   onProfileChange: (profile: AccountProfile) => void
+  onSignOut: () => Promise<void>
 }
 
-const SettingsPage: React.FC<SettingsPageProps> = ({ account, onRebind, onProfileChange }) => {
+const SettingsPage: React.FC<SettingsPageProps> = ({ account, onRebind, onProfileChange, onSignOut }) => {
   const [rebinding, setRebinding] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [error, setError] = useState('')
   const avatarInputRef = useRef<HTMLInputElement | null>(null)
@@ -129,6 +133,17 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ account, onRebind, onProfil
       setError(err instanceof Error ? err.message : '头像更新失败，请稍后重试')
     } finally {
       setUploadingAvatar(false)
+    }
+  }
+
+  const handleSignOut = async () => {
+    try {
+      setSigningOut(true)
+      setError('')
+      await onSignOut()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '退出登录失败，请稍后重试')
+      setSigningOut(false)
     }
   }
 
@@ -184,6 +199,10 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ account, onRebind, onProfil
           </button>
         </div>
 
+        <button type="button" onClick={handleSignOut} disabled={signingOut} className="ios-button-secondary w-full py-3 text-sm disabled:opacity-60">
+          {signingOut ? '退出中...' : '退出登录'}
+        </button>
+
         {error && <div className="text-sm text-red-500">{error}</div>}
       </div>
 
@@ -235,6 +254,8 @@ const TabBar: React.FC = () => (
 )
 
 const AppContent: React.FC = () => {
+  const [authLoading, setAuthLoading] = useState(true)
+  const [phoneAuthed, setPhoneAuthed] = useState(false)
   const [isLocked, setIsLocked] = useState(true)
   const [accountLoading, setAccountLoading] = useState(false)
   const [account, setAccount] = useState<AccountProfile | null>(null)
@@ -242,7 +263,32 @@ const AppContent: React.FC = () => {
   const [startupError, setStartupError] = useState('')
 
   useEffect(() => {
-    if (isLocked) {
+    let active = true
+
+    isPhoneAuthenticated()
+      .then(authed => {
+        if (active) {
+          setPhoneAuthed(authed)
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setPhoneAuthed(false)
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setAuthLoading(false)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isLocked || !phoneAuthed) {
       return
     }
 
@@ -283,7 +329,7 @@ const AppContent: React.FC = () => {
     return () => {
       active = false
     }
-  }, [isLocked])
+  }, [isLocked, phoneAuthed])
 
   const settingsPage = useMemo(() => {
     if (!account) {
@@ -293,6 +339,13 @@ const AppContent: React.FC = () => {
     return (
       <SettingsPage
         account={account}
+        onSignOut={async () => {
+          await signOutPhoneAuth()
+          setPhoneAuthed(false)
+          setAccount(null)
+          setAvatarMap({})
+          setIsLocked(true)
+        }}
         onProfileChange={profile => {
           setAccount(profile)
           setAvatarMap(prev => {
@@ -313,6 +366,14 @@ const AppContent: React.FC = () => {
       />
     )
   }, [account])
+
+  if (authLoading) {
+    return <div className="ios-page min-h-screen flex items-center justify-center text-gray-500">登录状态检查中...</div>
+  }
+
+  if (!phoneAuthed) {
+    return <AuthGateway onAuthed={() => setPhoneAuthed(true)} />
+  }
 
   if (isLocked) {
     return <PasscodeLock onSuccess={() => setIsLocked(false)} />
