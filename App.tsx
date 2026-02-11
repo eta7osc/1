@@ -166,6 +166,20 @@ const AppContent: React.FC = () => {
           <button type="button" className="ios-button-primary w-full py-3" onClick={() => setAccountRetrySeed(prev => prev + 1)}>
             重试
           </button>
+          <button
+            type="button"
+            className="ios-button-secondary w-full py-3"
+            onClick={async () => {
+              await signOutPhoneAuth()
+              setPhoneAuthed(false)
+              setAccount(null)
+              setAvatarMap({})
+              setIsLocked(true)
+              setStartupError('')
+            }}
+          >
+            退出当前账号
+          </button>
         </div>
       </div>
     )
