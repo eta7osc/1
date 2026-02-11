@@ -1,13 +1,10 @@
 ﻿import React, { useEffect, useState } from 'react'
 import { ArrowRight, Delete, Heart, Lock } from 'lucide-react'
-import { STORAGE_KEYS } from '../constants'
-import { storage } from '../services/storageService'
+import { getAppLockPasscode, MIN_SECURITY_PASSCODE_LENGTH, setAppLockPasscode } from '../services/securityService'
 
 interface PasscodeLockProps {
   onSuccess: () => void
 }
-
-const MIN_PASSCODE_LENGTH = 4
 
 const PasscodeLock: React.FC<PasscodeLockProps> = ({ onSuccess }) => {
   const [passcode, setPasscode] = useState('')
@@ -16,7 +13,7 @@ const PasscodeLock: React.FC<PasscodeLockProps> = ({ onSuccess }) => {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    const stored = storage.get<string | null>(STORAGE_KEYS.PASSCODE, null)
+    const stored = getAppLockPasscode()
     if (stored) {
       setSavedPasscode(stored)
       setMode('login')
@@ -51,12 +48,12 @@ const PasscodeLock: React.FC<PasscodeLockProps> = ({ onSuccess }) => {
       return
     }
 
-    if (passcode.length < MIN_PASSCODE_LENGTH) {
-      setError(`密码长度至少 ${MIN_PASSCODE_LENGTH} 位`)
+    if (passcode.length < MIN_SECURITY_PASSCODE_LENGTH) {
+      setError(`密码长度至少 ${MIN_SECURITY_PASSCODE_LENGTH} 位`)
       return
     }
 
-    storage.set(STORAGE_KEYS.PASSCODE, passcode)
+    setAppLockPasscode(passcode)
     onSuccess()
   }
 
@@ -93,7 +90,7 @@ const PasscodeLock: React.FC<PasscodeLockProps> = ({ onSuccess }) => {
           <p className="ios-soft-text mb-5">{mode === 'login' ? '只有你们可以进入这个空间' : '使用数字和字母组合，增强安全性'}</p>
 
           <div className="flex gap-3 justify-center mb-2 min-h-[32px]">
-            {Array.from({ length: Math.max(passcode.length, MIN_PASSCODE_LENGTH) }).map((_, i) => (
+            {Array.from({ length: Math.max(passcode.length, MIN_SECURITY_PASSCODE_LENGTH) }).map((_, i) => (
               <div
                 key={i}
                 className={`w-4 h-4 rounded-full border-2 border-rose-500 transition-all ${

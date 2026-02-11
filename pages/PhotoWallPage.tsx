@@ -1,8 +1,13 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Eye, Heart, ImagePlus, Lock, ShieldAlert, Video } from 'lucide-react'
-import { STORAGE_KEYS } from '../constants'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { Eye, Heart, ImagePlus, Lock, Video } from 'lucide-react'
 import type { Sender } from '../services/chatService'
 import { createWallItem, fetchWallItems, WallItem } from '../services/photoWallService'
+import {
+  getPrivateWallPasscode,
+  MIN_SECURITY_PASSCODE_LENGTH,
+  setPrivateWallPasscode,
+  verifyPrivateWallPasscode
+} from '../services/securityService'
 
 interface PhotoWallPageProps {
   currentSender: Sender
@@ -18,29 +23,17 @@ const PhotoWallPage: React.FC<PhotoWallPageProps> = ({ currentSender }) => {
   const [privateItems, setPrivateItems] = useState<WallItem[]>([])
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [savingPrivatePassword, setSavingPrivatePassword] = useState(false)
   const [error, setError] = useState('')
+  const [hint, setHint] = useState('')
   const [privateUnlocked, setPrivateUnlocked] = useState(false)
-  const [password, setPassword] = useState('')
+  const [unlockPassword, setUnlockPassword] = useState('')
+  const [privatePassword, setPrivatePassword] = useState(() => getPrivateWallPasscode())
+  const [currentPrivatePassword, setCurrentPrivatePassword] = useState('')
+  const [newPrivatePassword, setNewPrivatePassword] = useState('')
+  const [confirmPrivatePassword, setConfirmPrivatePassword] = useState('')
   const [caption, setCaption] = useState('')
   const [showUploadSheet, setShowUploadSheet] = useState(false)
-
-  const privatePassword = useMemo(() => {
-    const envPassword = import.meta.env.VITE_PRIVATE_WALL_PASSWORD || ''
-    if (envPassword.trim()) {
-      return envPassword.trim()
-    }
-
-    const rawPasscode = localStorage.getItem(STORAGE_KEYS.PASSCODE) || ''
-    if (!rawPasscode) {
-      return ''
-    }
-
-    try {
-      return JSON.parse(rawPasscode)
-    } catch {
-      return rawPasscode
-    }
-  }, [])
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -93,23 +86,64 @@ const PhotoWallPage: React.FC<PhotoWallPageProps> = ({ currentSender }) => {
 
   const handleUnlockPrivate = async () => {
     if (!privatePassword) {
-      setError('私密照片墙密码未配置，请设置 VITE_PRIVATE_WALL_PASSWORD')
+      setError('请先设置私密墙密码')
       return
     }
 
-    if (password.trim() !== privatePassword) {
+    if (!verifyPrivateWallPasscode(unlockPassword)) {
       setError('密码错误')
       return
     }
 
     setPrivateUnlocked(true)
     setError('')
-    setPassword('')
+    setHint('私密墙已解锁')
+    setUnlockPassword('')
 
     try {
       await loadPrivate()
     } catch {
       setError('私密照片墙加载失败')
+    }
+  }
+
+  const handleSavePrivatePassword = () => {
+    try {
+      setSavingPrivatePassword(true)
+      setError('')
+      setHint('')
+
+      const existingPassword = getPrivateWallPasscode()
+      const hasExistingPassword = Boolean(existingPassword)
+      const trimmedCurrent = currentPrivatePassword.trim()
+      const trimmedNew = newPrivatePassword.trim()
+      const trimmedConfirm = confirmPrivatePassword.trim()
+
+      if (trimmedNew.length < MIN_SECURITY_PASSCODE_LENGTH) {
+        setError(`私密墙密码至少 ${MIN_SECURITY_PASSCODE_LENGTH} 位`)
+        return
+      }
+
+      if (trimmedNew !== trimmedConfirm) {
+        setError('两次输入的私密墙密码不一致')
+        return
+      }
+
+      if (hasExistingPassword && trimmedCurrent !== existingPassword) {
+        setError('当前私密墙密码不正确')
+        return
+      }
+
+      setPrivateWallPasscode(trimmedNew)
+      setPrivatePassword(trimmedNew)
+      setPrivateUnlocked(true)
+      setUnlockPassword('')
+      setCurrentPrivatePassword('')
+      setNewPrivatePassword('')
+      setConfirmPrivatePassword('')
+      setHint(hasExistingPassword ? '私密墙密码已更新' : '私密墙密码已设置')
+    } finally {
+      setSavingPrivatePassword(false)
     }
   }
 
@@ -170,28 +204,68 @@ const PhotoWallPage: React.FC<PhotoWallPageProps> = ({ currentSender }) => {
 
       {loading && <div className="text-center text-sm text-gray-400">加载中...</div>}
       {error && <div className="text-center text-sm text-red-500">{error}</div>}
+      {hint && <div className="text-center text-sm text-emerald-600">{hint}</div>}
 
-      {tab === 'private' && !privateUnlocked && (
+      {tab === 'private' && (
         <div className="ios-card p-5 space-y-4">
-          <div className="flex items-center gap-2 text-gray-700">
-            <Lock size={18} />
-            <h3 className="font-semibold">输入密码进入私密照片墙</h3>
-          </div>
-          <input
-            className="ios-input px-3 py-2"
-            type="password"
-            placeholder="私密照片墙密码"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-          />
-          <button type="button" className="ios-button-primary w-full py-3" onClick={handleUnlockPrivate}>
-            解锁私密墙
-          </button>
-          {!privatePassword && (
-            <div className="text-xs text-orange-500 inline-flex items-center gap-1">
-              <ShieldAlert size={13} /> 未配置 `VITE_PRIVATE_WALL_PASSWORD`，请先配置后重新构建。
-            </div>
+          {!privateUnlocked && (
+            <>
+              <div className="flex items-center gap-2 text-gray-700">
+                <Lock size={18} />
+                <h3 className="font-semibold">输入密码进入私密照片墙</h3>
+              </div>
+              <input
+                className="ios-input px-3 py-2"
+                type="password"
+                placeholder={privatePassword ? '私密照片墙密码' : '请先设置私密墙密码'}
+                value={unlockPassword}
+                onChange={e => setUnlockPassword(e.target.value)}
+              />
+              <button type="button" className="ios-button-primary w-full py-3" onClick={handleUnlockPrivate} disabled={!privatePassword}>
+                解锁私密墙
+              </button>
+            </>
           )}
+
+          <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-3 space-y-3">
+            <h4 className="text-sm font-semibold text-gray-700">私密墙密码设置</h4>
+            {privatePassword ? (
+              <input
+                className="ios-input px-3 py-2 text-sm"
+                type="password"
+                placeholder="当前私密墙密码"
+                value={currentPrivatePassword}
+                onChange={e => setCurrentPrivatePassword(e.target.value)}
+                disabled={savingPrivatePassword}
+              />
+            ) : (
+              <div className="text-xs text-amber-600 bg-amber-50 rounded-xl px-3 py-2">当前未设置私密墙密码，请先设置。</div>
+            )}
+            <input
+              className="ios-input px-3 py-2 text-sm"
+              type="password"
+              placeholder={`新密码（至少 ${MIN_SECURITY_PASSCODE_LENGTH} 位）`}
+              value={newPrivatePassword}
+              onChange={e => setNewPrivatePassword(e.target.value)}
+              disabled={savingPrivatePassword}
+            />
+            <input
+              className="ios-input px-3 py-2 text-sm"
+              type="password"
+              placeholder="确认新密码"
+              value={confirmPrivatePassword}
+              onChange={e => setConfirmPrivatePassword(e.target.value)}
+              disabled={savingPrivatePassword}
+            />
+            <button
+              type="button"
+              className="ios-button-primary w-full py-2.5 text-sm disabled:opacity-60"
+              onClick={handleSavePrivatePassword}
+              disabled={savingPrivatePassword}
+            >
+              {savingPrivatePassword ? '保存中...' : privatePassword ? '修改私密墙密码' : '设置私密墙密码'}
+            </button>
+          </div>
         </div>
       )}
 

@@ -1,21 +1,34 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Camera, ImagePlus, LogOut, Save, UserCircle2 } from 'lucide-react'
 import { AccountProfile, updateAccountAvatar, updateAccountCover, updateAccountUsername } from '../services/accountService'
+import {
+  getAppLockPasscode,
+  MIN_SECURITY_PASSCODE_LENGTH,
+  setAppLockEnabled as persistAppLockEnabled,
+  setAppLockPasscode
+} from '../services/securityService'
 
 interface ProfilePageProps {
   account: AccountProfile
+  appLockEnabled: boolean
+  onAppLockEnabledChange: (enabled: boolean) => void
   onProfileChange: (profile: AccountProfile) => void
   onSignOut: () => Promise<void>
 }
 
-const ProfilePage: React.FC<ProfilePageProps> = ({ account, onProfileChange, onSignOut }) => {
+const ProfilePage: React.FC<ProfilePageProps> = ({ account, appLockEnabled, onAppLockEnabledChange, onProfileChange, onSignOut }) => {
   const [username, setUsername] = useState(account.username)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [uploadingCover, setUploadingCover] = useState(false)
   const [savingName, setSavingName] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
+  const [savingSecurity, setSavingSecurity] = useState(false)
   const [error, setError] = useState('')
   const [hint, setHint] = useState('')
+  const [appLockSwitch, setAppLockSwitch] = useState(appLockEnabled)
+  const [currentPasscode, setCurrentPasscode] = useState('')
+  const [newPasscode, setNewPasscode] = useState('')
+  const [confirmPasscode, setConfirmPasscode] = useState('')
 
   const avatarInputRef = useRef<HTMLInputElement | null>(null)
   const coverInputRef = useRef<HTMLInputElement | null>(null)
@@ -23,6 +36,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ account, onProfileChange, onS
   useEffect(() => {
     setUsername(account.username)
   }, [account.username])
+
+  useEffect(() => {
+    setAppLockSwitch(appLockEnabled)
+  }, [appLockEnabled])
 
   const shortUid = useMemo(() => {
     if (!account.uid) {
@@ -104,6 +121,69 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ account, onProfileChange, onS
       setError(err instanceof Error ? err.message : '用户名更新失败，请稍后重试')
     } finally {
       setSavingName(false)
+    }
+  }
+
+  const handleSaveSecurity = () => {
+    try {
+      setSavingSecurity(true)
+      setError('')
+      setHint('')
+
+      const existingPasscode = getAppLockPasscode()
+      const hasExistingPasscode = existingPasscode.length >= MIN_SECURITY_PASSCODE_LENGTH
+      const trimmedCurrent = currentPasscode.trim()
+      const trimmedNew = newPasscode.trim()
+      const trimmedConfirm = confirmPasscode.trim()
+      const hasNewPasscodeInput = Boolean(trimmedNew || trimmedConfirm)
+
+      if (!appLockSwitch) {
+        persistAppLockEnabled(false)
+        onAppLockEnabledChange(false)
+        setHint('已关闭进入程序密码')
+        setCurrentPasscode('')
+        setNewPasscode('')
+        setConfirmPasscode('')
+        return
+      }
+
+      if (!hasExistingPasscode && !hasNewPasscodeInput) {
+        setError('首次开启请先设置访问密码')
+        return
+      }
+
+      if (hasNewPasscodeInput) {
+        if (trimmedNew.length < MIN_SECURITY_PASSCODE_LENGTH) {
+          setError(`新密码至少 ${MIN_SECURITY_PASSCODE_LENGTH} 位`)
+          return
+        }
+
+        if (trimmedNew !== trimmedConfirm) {
+          setError('两次输入的新密码不一致')
+          return
+        }
+
+        if (hasExistingPasscode && trimmedCurrent !== existingPasscode) {
+          setError('当前密码不正确')
+          return
+        }
+
+        setAppLockPasscode(trimmedNew)
+      }
+
+      if (!getAppLockPasscode()) {
+        setError('请先设置访问密码')
+        return
+      }
+
+      persistAppLockEnabled(true)
+      onAppLockEnabledChange(true)
+      setHint(hasNewPasscodeInput ? '访问密码已更新并启用' : '已开启进入程序密码')
+      setCurrentPasscode('')
+      setNewPasscode('')
+      setConfirmPasscode('')
+    } finally {
+      setSavingSecurity(false)
     }
   }
 
@@ -204,6 +284,51 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ account, onProfileChange, onS
 
       <section className="ios-card p-4 space-y-3">
         <h3 className="text-sm font-semibold text-gray-700">账号安全</h3>
+        <div className="rounded-2xl border border-rose-100 bg-rose-50/60 p-3 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-gray-700">进入程序密码</p>
+              <p className="text-xs text-gray-500 mt-1">{appLockSwitch ? '当前：已开启' : '当前：已关闭'}</p>
+            </div>
+            <button
+              type="button"
+              className={`ios-pill px-3 py-1.5 text-xs ${appLockSwitch ? 'text-rose-500 border-rose-300 bg-rose-100' : ''}`}
+              onClick={() => setAppLockSwitch(prev => !prev)}
+              disabled={savingSecurity}
+            >
+              {appLockSwitch ? '已开启' : '已关闭'}
+            </button>
+          </div>
+
+          <input
+            className="ios-input px-3 py-2 text-sm"
+            type="password"
+            placeholder="当前密码（修改时必填）"
+            value={currentPasscode}
+            onChange={e => setCurrentPasscode(e.target.value)}
+            disabled={savingSecurity || !appLockSwitch}
+          />
+          <input
+            className="ios-input px-3 py-2 text-sm"
+            type="password"
+            placeholder={appLockSwitch ? '新密码（至少 4 位）' : '开启后可设置新密码'}
+            value={newPasscode}
+            onChange={e => setNewPasscode(e.target.value)}
+            disabled={savingSecurity || !appLockSwitch}
+          />
+          <input
+            className="ios-input px-3 py-2 text-sm"
+            type="password"
+            placeholder="确认新密码"
+            value={confirmPasscode}
+            onChange={e => setConfirmPasscode(e.target.value)}
+            disabled={savingSecurity || !appLockSwitch}
+          />
+          <button type="button" onClick={handleSaveSecurity} disabled={savingSecurity} className="ios-button-primary w-full py-2.5 text-sm disabled:opacity-60">
+            {savingSecurity ? '保存中...' : '保存访问密码设置'}
+          </button>
+        </div>
+
         <button type="button" onClick={handleSignOut} disabled={signingOut} className="ios-button-secondary w-full py-3 text-sm disabled:opacity-60">
           <span className="inline-flex items-center gap-1">
             <LogOut size={14} /> {signingOut ? '退出中...' : '退出登录'}

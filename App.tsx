@@ -5,6 +5,7 @@ import PasscodeLock from './components/PasscodeLock'
 import AuthGateway from './components/AuthGateway'
 import { AccountProfile, CoupleAvatarMap, ensureAccountProfile, getCoupleAvatarMap } from './services/accountService'
 import { isPhoneAuthenticated, signOutPhoneAuth } from './services/authService'
+import { getAppLockEnabled } from './services/securityService'
 
 const ChatPage = lazy(() => import('./pages/ChatPage'))
 const AnniversaryPage = lazy(() => import('./pages/AnniversaryPage'))
@@ -67,7 +68,8 @@ const TabBar: React.FC = () => (
 const AppContent: React.FC = () => {
   const [authLoading, setAuthLoading] = useState(true)
   const [phoneAuthed, setPhoneAuthed] = useState(false)
-  const [isLocked, setIsLocked] = useState(true)
+  const [appLockEnabled, setAppLockEnabled] = useState(() => getAppLockEnabled())
+  const [isLocked, setIsLocked] = useState(() => getAppLockEnabled())
   const [accountLoading, setAccountLoading] = useState(false)
   const [account, setAccount] = useState<AccountProfile | null>(null)
   const [avatarMap, setAvatarMap] = useState<CoupleAvatarMap>({})
@@ -98,6 +100,14 @@ const AppContent: React.FC = () => {
       active = false
     }
   }, [])
+
+  useEffect(() => {
+    if (!phoneAuthed) {
+      return
+    }
+
+    setIsLocked(appLockEnabled)
+  }, [appLockEnabled, phoneAuthed])
 
   useEffect(() => {
     if (isLocked || !phoneAuthed) {
@@ -149,7 +159,7 @@ const AppContent: React.FC = () => {
     return <AuthGateway onAuthed={() => setPhoneAuthed(true)} />
   }
 
-  if (isLocked) {
+  if (appLockEnabled && isLocked) {
     return <PasscodeLock onSuccess={() => setIsLocked(false)} />
   }
 
@@ -174,7 +184,7 @@ const AppContent: React.FC = () => {
               setPhoneAuthed(false)
               setAccount(null)
               setAvatarMap({})
-              setIsLocked(true)
+              setIsLocked(appLockEnabled)
               setStartupError('')
             }}
           >
@@ -220,6 +230,11 @@ const AppContent: React.FC = () => {
                   element={
                     <ProfilePage
                       account={account}
+                      appLockEnabled={appLockEnabled}
+                      onAppLockEnabledChange={enabled => {
+                        setAppLockEnabled(enabled)
+                        setIsLocked(enabled)
+                      }}
                       onProfileChange={profile => {
                         setAccount(profile)
                         setAvatarMap(prev => {
@@ -237,7 +252,7 @@ const AppContent: React.FC = () => {
                         setPhoneAuthed(false)
                         setAccount(null)
                         setAvatarMap({})
-                        setIsLocked(true)
+                        setIsLocked(appLockEnabled)
                       }}
                     />
                   }

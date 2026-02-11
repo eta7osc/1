@@ -10,6 +10,8 @@ export const COLORS = {
 
 export const STORAGE_KEYS = {
   PASSCODE: 'lovers_secret_passcode',
+  APP_LOCK_ENABLED: 'lovers_secret_app_lock_enabled',
+  PRIVATE_WALL_PASSCODE: 'lovers_secret_private_wall_passcode',
   SECURITY_QA: 'lovers_secret_security_qa',
   MESSAGES: 'lovers_secret_messages',
   ANNIVERSARIES: 'lovers_secret_anniversaries',
