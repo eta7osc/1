@@ -489,18 +489,27 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
           const leftSeconds = remainingSeconds(message, nowMs)
 
           return (
-            <div key={message._id} className={`w-full flex items-end gap-2 ${isMine ? 'justify-start flex-row-reverse' : 'justify-start'}`}>
+            <div key={message._id} className={`w-full flex items-start gap-2 ${isMine ? 'justify-start flex-row-reverse' : 'justify-start'}`}>
               <div className="h-9 w-9 rounded-full overflow-hidden bg-rose-100 text-rose-400 border border-rose-200/80 shrink-0 flex items-center justify-center">
                 {avatarUrl ? <img src={avatarUrl} alt="chat-avatar" className="h-full w-full object-cover" /> : <UserCircle2 size={20} />}
               </div>
               <div className={`max-w-[82%] sm:max-w-[78%] relative ${isMine ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
                 <div
-                  className={`rounded-2xl px-3 py-2 shadow-sm border ${
+                  className={`relative rounded-2xl px-3 py-2 shadow-sm border ${
                     isMine
                       ? 'bg-[linear-gradient(135deg,#ff7fa4,#ff4f7a)] text-white border-rose-300/50'
                       : 'bg-white/95 text-gray-800 border-rose-100'
                   }`}
                 >
+                  <span
+                    aria-hidden
+                    className={`absolute top-3 h-2.5 w-2.5 rotate-45 border-b border-r ${
+                      isMine
+                        ? '-right-1.5 bg-[linear-gradient(135deg,#ff7fa4,#ff4f7a)] border-rose-300/50'
+                        : '-left-1.5 bg-white/95 border-rose-100'
+                    }`}
+                  />
+
                   {message.type === 'text' && <p className="whitespace-pre-wrap break-words text-[15px]">{message.content}</p>}
 
                   {message.type === 'emoji' && message.url && (
