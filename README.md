@@ -32,8 +32,6 @@ cp .env.example .env.local
 
 ```env
 VITE_CLOUDBASE_ENV_ID=你的云开发环境ID
-VITE_ME_INVITE_CODE=我方邀请码
-VITE_HER_INVITE_CODE=她方邀请码
 VITE_PRIVATE_WALL_PASSWORD=私密墙密码
 # VITE_MAX_CHAT_FILE_MB=300
 # VITE_PUBLIC_BASE=/
@@ -80,7 +78,7 @@ npm run build
 
 2. 打开 CloudBase 控制台 -> 你的环境 -> 静态托管 -> 上传文件
 3. 上传 `dist/` 目录全部文件并发布
-4. 用两个设备分别打开同一个静态托管访问地址，使用双方邀请码绑定账号即可开始聊天
+4. 用两个设备分别打开同一个静态托管访问地址，分别选择“我 / 她”完成绑定即可开始聊天
 
 如果你之后改成子路径部署（例如 `/lovers-message/`），请把 `.env.local` 中 `VITE_PUBLIC_BASE` 改为对应子路径后重新构建再上传。
 

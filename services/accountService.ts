@@ -4,23 +4,41 @@ import type { Sender } from './chatService'
 const ACCOUNT_COLLECTION = 'couple_accounts'
 const ACCOUNT_STORAGE_KEY = 'lovers_secret_account_profile'
 const MAX_AVATAR_FILE_SIZE = 5 * 1024 * 1024
+const MAX_COVER_FILE_SIZE = 8 * 1024 * 1024
+const MAX_USERNAME_LENGTH = 20
 
 export interface AccountProfile {
   uid: string
   role: Sender
   nickname: string
+  username: string
   avatarFileId?: string
   avatarUrl?: string
+  coverFileId?: string
+  coverUrl?: string
 }
 
 export type CoupleAvatarMap = Partial<Record<Sender, string>>
 
-function getExpectedInviteCode(role: Sender) {
-  return role === 'me' ? import.meta.env.VITE_ME_INVITE_CODE : import.meta.env.VITE_HER_INVITE_CODE
+function normalizeRole(value: unknown): Sender {
+  return value === 'her' ? 'her' : 'me'
 }
 
 function roleToNickname(role: Sender) {
   return role === 'me' ? '我' : '她'
+}
+
+function normalizeUsername(value: unknown, fallback: string): string {
+  if (typeof value !== 'string') {
+    return fallback
+  }
+
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return fallback
+  }
+
+  return trimmed.slice(0, MAX_USERNAME_LENGTH)
 }
 
 function readCachedProfile(): AccountProfile | null {
@@ -30,11 +48,26 @@ function readCachedProfile(): AccountProfile | null {
   }
 
   try {
-    const parsed = JSON.parse(raw) as AccountProfile
-    if (!parsed.uid || (parsed.role !== 'me' && parsed.role !== 'her')) {
+    const parsed = JSON.parse(raw) as any
+    const uid = String(parsed?.uid || '').trim()
+    if (!uid) {
       return null
     }
-    return parsed
+
+    const role = normalizeRole(parsed?.role)
+    const fallbackName = roleToNickname(role)
+    const username = normalizeUsername(parsed?.username ?? parsed?.nickname, fallbackName)
+
+    return {
+      uid,
+      role,
+      username,
+      nickname: username,
+      avatarFileId: typeof parsed?.avatarFileId === 'string' ? parsed.avatarFileId : undefined,
+      avatarUrl: typeof parsed?.avatarUrl === 'string' ? parsed.avatarUrl : undefined,
+      coverFileId: typeof parsed?.coverFileId === 'string' ? parsed.coverFileId : undefined,
+      coverUrl: typeof parsed?.coverUrl === 'string' ? parsed.coverUrl : undefined
+    }
   } catch {
     return null
   }
@@ -44,7 +77,7 @@ function saveCachedProfile(profile: AccountProfile) {
   localStorage.setItem(ACCOUNT_STORAGE_KEY, JSON.stringify(profile))
 }
 
-async function resolveAvatarUrl(fileId?: string): Promise<string | undefined> {
+async function resolveFileUrl(fileId?: string): Promise<string | undefined> {
   if (!fileId) {
     return undefined
   }
@@ -63,22 +96,98 @@ async function resolveAvatarUrl(fileId?: string): Promise<string | undefined> {
   return undefined
 }
 
-function assertValidAvatar(file: File) {
+function assertValidImage(file: File, maxFileSize: number, label: string) {
   if (!file.type.startsWith('image/')) {
-    throw new Error('头像仅支持图片文件')
+    throw new Error(`${label}仅支持图片文件`)
   }
 
-  if (file.size > MAX_AVATAR_FILE_SIZE) {
-    throw new Error('头像大小不能超过 5MB')
+  if (file.size > maxFileSize) {
+    throw new Error(`${label}大小不能超过 ${Math.round(maxFileSize / 1024 / 1024)}MB`)
   }
 }
 
-async function uploadAvatar(file: File): Promise<string> {
+async function uploadImage(file: File, folder: string): Promise<string> {
   const storage = getStorage()
   const ext = file.name.split('.').pop() || 'png'
-  const cloudPath = `avatars/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+  const cloudPath = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
   const uploadRes = await storage.uploadFile({ cloudPath, filePath: file as any })
   return String(uploadRes.fileID)
+}
+
+async function getRowByUid(db: any, uid: string) {
+  const query = await db.collection(ACCOUNT_COLLECTION).where({ uid }).limit(1).get()
+  return query.data?.[0] as any
+}
+
+async function profileFromRow(uid: string, row: any): Promise<AccountProfile> {
+  const role = normalizeRole(row?.role)
+  const fallbackName = roleToNickname(role)
+  const username = normalizeUsername(row?.username ?? row?.nickname, fallbackName)
+  const avatarFileId = typeof row?.avatarFileId === 'string' ? row.avatarFileId : undefined
+  const coverFileId = typeof row?.coverFileId === 'string' ? row.coverFileId : undefined
+
+  const [avatarUrl, coverUrl] = await Promise.all([resolveFileUrl(avatarFileId), resolveFileUrl(coverFileId)])
+
+  return {
+    uid,
+    role,
+    username,
+    nickname: username,
+    avatarFileId,
+    avatarUrl,
+    coverFileId,
+    coverUrl
+  }
+}
+
+async function updateCurrentProfileRow(updates: Record<string, unknown>): Promise<AccountProfile> {
+  await ensureLogin()
+  const uid = await getCurrentUid()
+  if (!uid) {
+    throw new Error('账号初始化失败，请刷新页面重试')
+  }
+
+  const db = app.database()
+  const row = await getRowByUid(db, uid)
+  if (!row?._id) {
+    throw new Error('账号资料不存在，请重新登录后重试')
+  }
+
+  await db.collection(ACCOUNT_COLLECTION).doc(row._id).update({
+    ...updates,
+    updatedAt: new Date()
+  })
+
+  const profile = await profileFromRow(uid, { ...row, ...updates })
+  saveCachedProfile(profile)
+  return profile
+}
+
+function pickNextRole(rows: any[], currentUid: string): Sender | null {
+  const holder = new Map<Sender, string>()
+
+  rows.forEach(row => {
+    const uid = typeof row?.uid === 'string' ? row.uid : ''
+    if (!uid) {
+      return
+    }
+    const role = normalizeRole(row?.role)
+    if (!holder.has(role)) {
+      holder.set(role, uid)
+    }
+  })
+
+  const meUid = holder.get('me')
+  if (!meUid || meUid === currentUid) {
+    return 'me'
+  }
+
+  const herUid = holder.get('her')
+  if (!herUid || herUid === currentUid) {
+    return 'her'
+  }
+
+  return null
 }
 
 export function clearCachedProfile() {
@@ -93,8 +202,7 @@ export async function unbindCurrentAccount(): Promise<void> {
   }
 
   const db = app.database()
-  const currentQuery = await db.collection(ACCOUNT_COLLECTION).where({ uid }).limit(1).get()
-  const currentRow = currentQuery.data?.[0] as any
+  const currentRow = await getRowByUid(db, uid)
 
   if (currentRow?._id) {
     await db.collection(ACCOUNT_COLLECTION).doc(currentRow._id).remove()
@@ -112,120 +220,97 @@ export async function getBoundAccount(): Promise<AccountProfile | null> {
 
   const cached = readCachedProfile()
   if (cached && cached.uid === uid) {
-    const profile: AccountProfile = {
+    const refreshed: AccountProfile = {
       ...cached,
-      avatarUrl: await resolveAvatarUrl(cached.avatarFileId)
+      avatarUrl: await resolveFileUrl(cached.avatarFileId),
+      coverUrl: await resolveFileUrl(cached.coverFileId)
     }
-    saveCachedProfile(profile)
-    return profile
+    saveCachedProfile(refreshed)
+    return refreshed
   }
 
   const db = app.database()
-  const res = await db.collection(ACCOUNT_COLLECTION).where({ uid }).limit(1).get()
-  const row = res.data?.[0] as any
+  const row = await getRowByUid(db, uid)
   if (!row) {
     clearCachedProfile()
     return null
   }
 
-  const role = row.role === 'her' ? 'her' : 'me'
-  const avatarFileId = typeof row.avatarFileId === 'string' ? row.avatarFileId : undefined
-  const profile: AccountProfile = {
-    uid,
-    role,
-    nickname: roleToNickname(role),
-    avatarFileId,
-    avatarUrl: await resolveAvatarUrl(avatarFileId)
-  }
+  const profile = await profileFromRow(uid, row)
   saveCachedProfile(profile)
   return profile
 }
 
-export async function bindAccount(role: Sender, inviteCode: string): Promise<AccountProfile> {
+export async function ensureAccountProfile(): Promise<AccountProfile> {
+  const existed = await getBoundAccount()
+  if (existed) {
+    return existed
+  }
+
   await ensureLogin()
   const uid = await getCurrentUid()
   if (!uid) {
     throw new Error('账号初始化失败，请刷新页面重试')
   }
 
-  const expectedInviteCode = getExpectedInviteCode(role)
-  if (!expectedInviteCode) {
-    throw new Error(`缺少 ${role === 'me' ? 'VITE_ME_INVITE_CODE' : 'VITE_HER_INVITE_CODE'} 配置`)
-  }
-
-  if (inviteCode.trim() !== expectedInviteCode) {
-    throw new Error('邀请码不正确')
-  }
-
   const db = app.database()
+  const allRes = await db.collection(ACCOUNT_COLLECTION).get()
+  const rows = (allRes.data || []) as any[]
 
-  const roleQuery = await db.collection(ACCOUNT_COLLECTION).where({ role }).limit(1).get()
-  const roleRow = roleQuery.data?.[0] as any
-  if (roleRow && roleRow.uid && roleRow.uid !== uid) {
-    throw new Error(`角色“${roleToNickname(role)}”已被绑定`)
+  const role = pickNextRole(rows, uid)
+  if (!role) {
+    throw new Error('当前情侣空间已满，暂无法加入新成员')
   }
 
-  const currentQuery = await db.collection(ACCOUNT_COLLECTION).where({ uid }).limit(1).get()
-  const currentRow = currentQuery.data?.[0] as any
+  const username = roleToNickname(role)
 
-  const payload = {
+  await db.collection(ACCOUNT_COLLECTION).add({
     uid,
     role,
-    nickname: roleToNickname(role),
-    avatarFileId: typeof currentRow?.avatarFileId === 'string' ? currentRow.avatarFileId : null,
+    username,
+    nickname: username,
+    avatarFileId: null,
+    coverFileId: null,
+    createdAt: new Date(),
     updatedAt: new Date()
+  })
+
+  const row = await getRowByUid(db, uid)
+  if (!row) {
+    throw new Error('创建账号资料失败，请稍后重试')
   }
 
-  if (currentRow?._id) {
-    await db.collection(ACCOUNT_COLLECTION).doc(currentRow._id).update(payload)
-  } else {
-    await db.collection(ACCOUNT_COLLECTION).add(payload)
-  }
-
-  const avatarFileId = typeof currentRow?.avatarFileId === 'string' ? currentRow.avatarFileId : undefined
-  const profile: AccountProfile = {
-    uid,
-    role,
-    nickname: roleToNickname(role),
-    avatarFileId,
-    avatarUrl: await resolveAvatarUrl(avatarFileId)
-  }
+  const profile = await profileFromRow(uid, row)
   saveCachedProfile(profile)
   return profile
 }
 
 export async function updateAccountAvatar(file: File): Promise<AccountProfile> {
-  assertValidAvatar(file)
-  await ensureLogin()
+  assertValidImage(file, MAX_AVATAR_FILE_SIZE, '头像')
+  const avatarFileId = await uploadImage(file, 'avatars')
+  return updateCurrentProfileRow({ avatarFileId })
+}
 
-  const uid = await getCurrentUid()
-  if (!uid) {
-    throw new Error('账号初始化失败，请刷新页面重试')
+export async function updateAccountCover(file: File): Promise<AccountProfile> {
+  assertValidImage(file, MAX_COVER_FILE_SIZE, '背景图')
+  const coverFileId = await uploadImage(file, 'profile-covers')
+  return updateCurrentProfileRow({ coverFileId })
+}
+
+export async function updateAccountUsername(rawUsername: string): Promise<AccountProfile> {
+  const username = rawUsername.trim()
+  if (!username) {
+    throw new Error('用户名不能为空')
   }
 
-  const db = app.database()
-  const query = await db.collection(ACCOUNT_COLLECTION).where({ uid }).limit(1).get()
-  const row = query.data?.[0] as any
-  if (!row?._id) {
-    throw new Error('请先绑定账号，再设置头像')
+  if (username.length > MAX_USERNAME_LENGTH) {
+    throw new Error(`用户名不能超过 ${MAX_USERNAME_LENGTH} 个字符`)
   }
 
-  const avatarFileId = await uploadAvatar(file)
-  await db.collection(ACCOUNT_COLLECTION).doc(row._id).update({
-    avatarFileId,
-    updatedAt: new Date()
+  return updateCurrentProfileRow({
+    username,
+    nickname: username
   })
-
-  const role = row.role === 'her' ? 'her' : 'me'
-  const profile: AccountProfile = {
-    uid,
-    role,
-    nickname: roleToNickname(role),
-    avatarFileId,
-    avatarUrl: await resolveAvatarUrl(avatarFileId)
-  }
-  saveCachedProfile(profile)
-  return profile
 }
 
 export async function getCoupleAvatarMap(): Promise<CoupleAvatarMap> {
@@ -235,15 +320,21 @@ export async function getCoupleAvatarMap(): Promise<CoupleAvatarMap> {
   const res = await db.collection(ACCOUNT_COLLECTION).get()
   const rows = (res.data || []) as any[]
 
+  const entries = await Promise.all(
+    rows.map(async row => {
+      const role: Sender = normalizeRole(row?.role)
+      const avatarFileId = typeof row?.avatarFileId === 'string' ? row.avatarFileId : undefined
+      const avatarUrl = await resolveFileUrl(avatarFileId)
+      return { role, avatarUrl }
+    })
+  )
+
   const map: CoupleAvatarMap = {}
-  for (const row of rows) {
-    const role: Sender = row?.role === 'her' ? 'her' : 'me'
-    const avatarFileId = typeof row?.avatarFileId === 'string' ? row.avatarFileId : undefined
-    const avatarUrl = await resolveAvatarUrl(avatarFileId)
-    if (avatarUrl) {
-      map[role] = avatarUrl
+  entries.forEach(entry => {
+    if (entry.avatarUrl) {
+      map[entry.role] = entry.avatarUrl
     }
-  }
+  })
 
   return map
 }

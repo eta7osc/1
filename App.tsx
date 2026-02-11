@@ -1,215 +1,16 @@
-﻿import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
+﻿import React, { Suspense, lazy, useEffect, useState } from 'react'
 import { HashRouter as Router, Navigate, NavLink, Route, Routes } from 'react-router-dom'
-import { CalendarClock, Camera, House, MessageCircle, Settings, ShieldCheck, UserCircle2 } from 'lucide-react'
+import { CalendarClock, Camera, House, MessageCircle, UserCircle2 } from 'lucide-react'
 import PasscodeLock from './components/PasscodeLock'
 import AuthGateway from './components/AuthGateway'
-import {
-  AccountProfile,
-  CoupleAvatarMap,
-  bindAccount,
-  getBoundAccount,
-  getCoupleAvatarMap,
-  unbindCurrentAccount,
-  updateAccountAvatar
-} from './services/accountService'
+import { AccountProfile, CoupleAvatarMap, ensureAccountProfile, getCoupleAvatarMap } from './services/accountService'
 import { isPhoneAuthenticated, signOutPhoneAuth } from './services/authService'
-import type { Sender } from './services/chatService'
 
 const ChatPage = lazy(() => import('./pages/ChatPage'))
 const AnniversaryPage = lazy(() => import('./pages/AnniversaryPage'))
 const HomePage = lazy(() => import('./pages/HomePage'))
 const PhotoWallPage = lazy(() => import('./pages/PhotoWallPage'))
-
-const AccountBindPage: React.FC<{ onBound: (profile: AccountProfile) => void; startupError?: string }> = ({
-  onBound,
-  startupError
-}) => {
-  const [role, setRole] = useState<Sender>('me')
-  const [inviteCode, setInviteCode] = useState('')
-  const [binding, setBinding] = useState(false)
-  const [error, setError] = useState('')
-
-  const handleBind = async () => {
-    if (!inviteCode.trim()) {
-      setError('请输入邀请码')
-      return
-    }
-
-    try {
-      setBinding(true)
-      setError('')
-      const profile = await bindAccount(role, inviteCode)
-      onBound(profile)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '绑定失败，请稍后重试')
-    } finally {
-      setBinding(false)
-    }
-  }
-
-  return (
-    <div className="ios-page flex min-h-screen items-center justify-center p-6">
-      <div className="ios-card w-full max-w-sm p-6 space-y-5 relative z-10">
-        <div className="flex items-center gap-3">
-          <div className="h-11 w-11 rounded-2xl bg-rose-100 text-rose-500 flex items-center justify-center">
-            <ShieldCheck size={22} />
-          </div>
-          <div>
-            <h2 className="ios-title text-2xl">绑定情侣账号</h2>
-            <p className="text-xs ios-soft-text">仅允许你们两位使用，绑定后自动互联同步</p>
-          </div>
-        </div>
-
-        {startupError && <div className="text-sm text-red-500">{startupError}</div>}
-
-        <div className="ios-segment w-full">
-          <button type="button" onClick={() => setRole('me')} className={role === 'me' ? 'is-active flex-1' : 'flex-1'}>
-            我
-          </button>
-          <button type="button" onClick={() => setRole('her')} className={role === 'her' ? 'is-active flex-1' : 'flex-1'}>
-            她
-          </button>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-xs text-gray-500">请输入{role === 'me' ? '我方' : '她方'}邀请码</label>
-          <input
-            className="ios-input px-3 py-2.5"
-            value={inviteCode}
-            onChange={e => setInviteCode(e.target.value)}
-            placeholder="邀请码"
-          />
-        </div>
-
-        {error && <div className="text-sm text-red-500">{error}</div>}
-
-        <button type="button" onClick={handleBind} disabled={binding} className="ios-button-primary w-full py-3 disabled:opacity-60">
-          {binding ? '绑定中...' : '确认绑定'}
-        </button>
-      </div>
-    </div>
-  )
-}
-
-interface SettingsPageProps {
-  account: AccountProfile
-  onRebind: () => Promise<void>
-  onProfileChange: (profile: AccountProfile) => void
-  onSignOut: () => Promise<void>
-}
-
-const SettingsPage: React.FC<SettingsPageProps> = ({ account, onRebind, onProfileChange, onSignOut }) => {
-  const [rebinding, setRebinding] = useState(false)
-  const [signingOut, setSigningOut] = useState(false)
-  const [uploadingAvatar, setUploadingAvatar] = useState(false)
-  const [error, setError] = useState('')
-  const avatarInputRef = useRef<HTMLInputElement | null>(null)
-
-  const handleRebind = async () => {
-    try {
-      setRebinding(true)
-      setError('')
-      await onRebind()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '解绑失败，请稍后重试')
-      setRebinding(false)
-    }
-  }
-
-  const handleAvatarInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-
-    if (!file || uploadingAvatar) {
-      return
-    }
-
-    try {
-      setUploadingAvatar(true)
-      setError('')
-      const profile = await updateAccountAvatar(file)
-      onProfileChange(profile)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '头像更新失败，请稍后重试')
-    } finally {
-      setUploadingAvatar(false)
-    }
-  }
-
-  const handleSignOut = async () => {
-    try {
-      setSigningOut(true)
-      setError('')
-      await onSignOut()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '退出登录失败，请稍后重试')
-      setSigningOut(false)
-    }
-  }
-
-  return (
-    <div className="ios-page ios-safe-top ios-scroll page-stack">
-      <div className="ios-card p-5 space-y-5">
-        <div>
-          <h2 className="ios-title text-2xl">设置</h2>
-          <p className="text-sm ios-soft-text mt-1">管理身份、安全和双人空间</p>
-        </div>
-
-        <div className="ios-card-flat p-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="h-14 w-14 rounded-full overflow-hidden bg-rose-100 text-rose-400 flex items-center justify-center">
-              {account.avatarUrl ? (
-                <img src={account.avatarUrl} alt="avatar" className="h-full w-full object-cover" />
-              ) : (
-                <UserCircle2 size={40} />
-              )}
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-gray-700">我的头像</p>
-              <p className="text-xs text-gray-500">支持 jpg/png/webp，大小不超过 5MB</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => avatarInputRef.current?.click()}
-            disabled={uploadingAvatar}
-            className="ios-button-secondary px-3 py-2 text-sm disabled:opacity-60"
-          >
-            {uploadingAvatar ? '上传中...' : '更换头像'}
-          </button>
-        </div>
-
-        <div className="ios-card-flat overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <span>当前账号</span>
-            <span className="ios-chip ios-chip-info">{account.nickname}</span>
-          </div>
-          <div className="px-4 py-3 border-b border-gray-100/80 flex items-center justify-between">
-            <span>双人绑定状态</span>
-            <span className="text-green-600 text-sm font-semibold">正常</span>
-          </div>
-          <button
-            type="button"
-            className="w-full px-4 py-3 text-left flex items-center justify-between disabled:opacity-60"
-            onClick={handleRebind}
-            disabled={rebinding}
-          >
-            <span>切换/重绑账号</span>
-            <span className="text-rose-500 text-sm font-semibold">{rebinding ? '解绑中...' : '重新绑定'}</span>
-          </button>
-        </div>
-
-        <button type="button" onClick={handleSignOut} disabled={signingOut} className="ios-button-secondary w-full py-3 text-sm disabled:opacity-60">
-          {signingOut ? '退出中...' : '退出登录'}
-        </button>
-
-        {error && <div className="text-sm text-red-500">{error}</div>}
-      </div>
-
-      <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarInput} />
-    </div>
-  )
-}
+const ProfilePage = lazy(() => import('./pages/ProfilePage'))
 
 const TabBar: React.FC = () => (
   <nav className="ios-tabbar ios-blur ios-safe-bottom">
@@ -251,13 +52,13 @@ const TabBar: React.FC = () => (
         <span className="text-[10px] font-semibold">照片墙</span>
       </NavLink>
       <NavLink
-        to="/settings"
+        to="/profile"
         className={({ isActive }) =>
           `ios-tab-item flex flex-col items-center gap-1 transition-colors ${isActive ? 'active text-rose-500' : 'text-gray-400'}`
         }
       >
-        <Settings size={22} />
-        <span className="text-[10px] font-semibold">设置</span>
+        <UserCircle2 size={22} />
+        <span className="text-[10px] font-semibold">主页</span>
       </NavLink>
     </div>
   </nav>
@@ -271,6 +72,7 @@ const AppContent: React.FC = () => {
   const [account, setAccount] = useState<AccountProfile | null>(null)
   const [avatarMap, setAvatarMap] = useState<CoupleAvatarMap>({})
   const [startupError, setStartupError] = useState('')
+  const [accountRetrySeed, setAccountRetrySeed] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -303,79 +105,41 @@ const AppContent: React.FC = () => {
     }
 
     let active = true
-    setAccountLoading(true)
-    setStartupError('')
 
-    getBoundAccount()
-      .then(profile => {
-        if (active) {
-          setAccount(profile)
+    const bootstrap = async () => {
+      try {
+        setAccountLoading(true)
+        setStartupError('')
+
+        const profile = await ensureAccountProfile()
+        const map = await getCoupleAvatarMap()
+
+        if (!active) {
+          return
         }
-      })
-      .catch(err => {
-        if (active) {
-          setStartupError(err instanceof Error ? err.message : '初始化失败')
-          setAccount(null)
+
+        setAccount(profile)
+        setAvatarMap(map)
+      } catch (err) {
+        if (!active) {
+          return
         }
-      })
-      .finally(() => {
+
+        setStartupError(err instanceof Error ? err.message : '初始化失败')
+        setAccount(null)
+      } finally {
         if (active) {
           setAccountLoading(false)
         }
-      })
+      }
+    }
 
-    getCoupleAvatarMap()
-      .then(map => {
-        if (active) {
-          setAvatarMap(map)
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setAvatarMap({})
-        }
-      })
+    bootstrap()
 
     return () => {
       active = false
     }
-  }, [isLocked, phoneAuthed])
-
-  const settingsPage = useMemo(() => {
-    if (!account) {
-      return <div className="px-6 pt-10">未绑定账号</div>
-    }
-
-    return (
-      <SettingsPage
-        account={account}
-        onSignOut={async () => {
-          await signOutPhoneAuth()
-          setPhoneAuthed(false)
-          setAccount(null)
-          setAvatarMap({})
-          setIsLocked(true)
-        }}
-        onProfileChange={profile => {
-          setAccount(profile)
-          setAvatarMap(prev => {
-            const next = { ...prev }
-            if (profile.avatarUrl) {
-              next[profile.role] = profile.avatarUrl
-            } else {
-              delete next[profile.role]
-            }
-            return next
-          })
-        }}
-        onRebind={async () => {
-          await unbindCurrentAccount()
-          setAccount(null)
-          setAvatarMap({})
-        }}
-      />
-    )
-  }, [account])
+  }, [accountRetrySeed, isLocked, phoneAuthed])
 
   if (authLoading) {
     return <div className="ios-page min-h-screen flex items-center justify-center text-gray-500">登录状态检查中...</div>
@@ -394,7 +158,17 @@ const AppContent: React.FC = () => {
   }
 
   if (!account) {
-    return <AccountBindPage onBound={setAccount} startupError={startupError} />
+    return (
+      <div className="ios-page min-h-screen flex items-center justify-center p-6">
+        <div className="ios-card w-full max-w-sm p-5 space-y-4">
+          <h2 className="ios-title text-xl">资料初始化失败</h2>
+          <p className="text-sm text-gray-500">{startupError || '请稍后重试'}</p>
+          <button type="button" className="ios-button-primary w-full py-3" onClick={() => setAccountRetrySeed(prev => prev + 1)}>
+            重试
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -417,7 +191,7 @@ const AppContent: React.FC = () => {
                   element={
                     <ChatPage
                       currentSender={account.role}
-                      currentUserLabel={account.nickname}
+                      currentUserLabel={account.username}
                       currentUserAvatar={account.avatarUrl}
                       avatarMap={avatarMap}
                     />
@@ -427,7 +201,35 @@ const AppContent: React.FC = () => {
                 <Route path="/home" element={<HomePage currentSender={account.role} avatarMap={avatarMap} />} />
                 <Route path="/moments" element={<Navigate to="/home" replace />} />
                 <Route path="/photos" element={<PhotoWallPage currentSender={account.role} />} />
-                <Route path="/settings" element={settingsPage} />
+                <Route
+                  path="/profile"
+                  element={
+                    <ProfilePage
+                      account={account}
+                      onProfileChange={profile => {
+                        setAccount(profile)
+                        setAvatarMap(prev => {
+                          const next = { ...prev }
+                          if (profile.avatarUrl) {
+                            next[profile.role] = profile.avatarUrl
+                          } else {
+                            delete next[profile.role]
+                          }
+                          return next
+                        })
+                      }}
+                      onSignOut={async () => {
+                        await signOutPhoneAuth()
+                        setPhoneAuthed(false)
+                        setAccount(null)
+                        setAvatarMap({})
+                        setIsLocked(true)
+                      }}
+                    />
+                  }
+                />
+                <Route path="/settings" element={<Navigate to="/profile" replace />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </div>
           </Suspense>
