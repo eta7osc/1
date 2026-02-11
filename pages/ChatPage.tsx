@@ -4,6 +4,7 @@ import {
   EmojiPackItem,
   fetchEmojiPacks,
   fetchMessages,
+  markMessagesRead,
   markPrivateMessageViewed,
   Message,
   saveEmojiPackFromMessage,
@@ -16,6 +17,7 @@ import {
 
 const POLL_INTERVAL_MS = 5000
 const MAX_VOICE_SECONDS = 60
+const WECHAT_TIME_GAP_MS = 5 * 60 * 1000
 const DESTRUCT_OPTIONS = [
   { label: '关闭', value: 0 },
   { label: '30 秒', value: 30 },
@@ -52,6 +54,49 @@ function getVoiceMimeType() {
 
   const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
   return candidates.find(type => MediaRecorder.isTypeSupported(type))
+}
+
+function isSameDate(left: Date, right: Date) {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  )
+}
+
+function formatMinuteLabel(date: Date) {
+  return date.toLocaleTimeString('zh-CN', {
+    hour: 'numeric',
+    minute: '2-digit'
+  })
+}
+
+function formatChatTimeDivider(iso: string) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+
+  const now = new Date()
+  if (isSameDate(date, now)) {
+    return formatMinuteLabel(date)
+  }
+
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (isSameDate(date, yesterday)) {
+    return `昨天 ${formatMinuteLabel(date)}`
+  }
+
+  if (date.getFullYear() === now.getFullYear()) {
+    return `${date.getMonth() + 1}月${date.getDate()}日 ${formatMinuteLabel(date)}`
+  }
+
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${formatMinuteLabel(date)}`
+}
+
+function hasReadBySender(message: Message, sender: Sender) {
+  return sender === 'me' ? Boolean(message.readByMeAt) : Boolean(message.readByHerAt)
 }
 
 const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, currentUserAvatar, avatarMap }) => {
@@ -99,6 +144,16 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
       const data = await fetchMessages()
       setMessages(data)
       setError('')
+
+      const unreadIncomingIds = data
+        .filter(message => message.senderId !== currentSender && !hasReadBySender(message, currentSender))
+        .map(message => message._id)
+
+      if (unreadIncomingIds.length > 0) {
+        void markMessagesRead(currentSender, unreadIncomingIds).catch(err => {
+          console.error('[Chat] mark messages read failed', err)
+        })
+      }
     } catch (err) {
       console.error('[Chat] load messages failed', err)
       setError('消息加载失败，请检查网络或云开发配置')
@@ -108,7 +163,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
         setLoading(false)
       }
     }
-  }, [])
+  }, [currentSender])
 
   const loadEmojiPacks = useCallback(async () => {
     try {
@@ -166,6 +221,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
       senderId: currentSender,
       type: 'text',
       content: text,
+      readByMeAt: currentSender === 'me' ? new Date().toISOString() : undefined,
+      readByHerAt: currentSender === 'her' ? new Date().toISOString() : undefined,
       createdAt: new Date().toISOString()
     }
 
@@ -197,6 +254,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
         senderId: currentSender,
         type: isVideo ? 'video' : 'image',
         content: '',
+        readByMeAt: currentSender === 'me' ? new Date().toISOString() : undefined,
+        readByHerAt: currentSender === 'her' ? new Date().toISOString() : undefined,
         createdAt: new Date().toISOString(),
         privateMedia: privateMode,
         selfDestructSeconds: privateMode ? destructSeconds : undefined
@@ -237,6 +296,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
         senderId: currentSender,
         type: 'audio',
         content: `语音 ${safeSeconds}s`,
+        readByMeAt: currentSender === 'me' ? new Date().toISOString() : undefined,
+        readByHerAt: currentSender === 'her' ? new Date().toISOString() : undefined,
         createdAt: new Date().toISOString()
       }
 
@@ -455,6 +516,43 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
   }
 
   const activeMessages = useMemo(() => messages.filter(message => !isMessageDestroyed(message, nowMs)), [messages, nowMs])
+  const peerSender: Sender = currentSender === 'me' ? 'her' : 'me'
+
+  const latestMineMessageId = useMemo(() => {
+    for (let i = activeMessages.length - 1; i >= 0; i -= 1) {
+      if (activeMessages[i].senderId === currentSender) {
+        return activeMessages[i]._id
+      }
+    }
+    return ''
+  }, [activeMessages, currentSender])
+
+  const renderItems = useMemo(() => {
+    const items: Array<{ type: 'time'; key: string; label: string } | { type: 'message'; message: Message }> = []
+    let prevTime = Number.NaN
+
+    for (const message of activeMessages) {
+      const currentTime = new Date(message.createdAt).getTime()
+      const shouldShowDivider =
+        !Number.isFinite(prevTime) || !Number.isFinite(currentTime) || currentTime - prevTime >= WECHAT_TIME_GAP_MS
+
+      if (shouldShowDivider) {
+        const label = formatChatTimeDivider(message.createdAt)
+        if (label) {
+        items.push({
+          type: 'time',
+          key: `time-${message._id}`,
+          label
+        })
+        }
+      }
+
+      items.push({ type: 'message', message })
+      prevTime = currentTime
+    }
+
+    return items
+  }, [activeMessages])
 
   return (
     <div className="ios-page h-full min-h-0 flex flex-col">
@@ -481,35 +579,41 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
         {loading && activeMessages.length === 0 && <div className="text-center text-xs text-gray-400">正在加载聊天记录...</div>}
         {!loading && activeMessages.length === 0 && <div className="text-center text-xs text-gray-400">还没有消息，发一条试试</div>}
 
-        {activeMessages.map(message => {
+        {renderItems.map(item => {
+          if (item.type === 'time') {
+            return (
+              <div key={item.key} className="flex justify-center py-0.5">
+                <span className="rounded-full border border-white/90 bg-white/70 px-2.5 py-0.5 text-[11px] text-gray-500 shadow-sm">
+                  {item.label}
+                </span>
+              </div>
+            )
+          }
+
+          const message = item.message
           const isMine = message.senderId === currentSender
           const avatarUrl = message.senderId === currentSender ? currentUserAvatar || avatarMap?.[currentSender] : avatarMap?.[message.senderId]
           const isPrivate = Boolean(message.privateMedia && (message.type === 'image' || message.type === 'video'))
           const isLocked = isPrivate && message.senderId !== currentSender && !message.viewedAt
           const leftSeconds = remainingSeconds(message, nowMs)
+          const isLatestMine = isMine && message._id === latestMineMessageId
+          const isReadByPeer = hasReadBySender(message, peerSender)
+          const readStatusLabel = message._id.startsWith('local-') ? '发送中' : isReadByPeer ? '已读' : '未读'
+          const showMetaRow = isLatestMine || (isPrivate && message.destructAt && leftSeconds > 0)
 
           return (
             <div key={message._id} className={`w-full flex items-start gap-2 ${isMine ? 'justify-start flex-row-reverse' : 'justify-start'}`}>
               <div className="h-9 w-9 rounded-full overflow-hidden bg-rose-100 text-rose-400 border border-rose-200/80 shrink-0 flex items-center justify-center">
                 {avatarUrl ? <img src={avatarUrl} alt="chat-avatar" className="h-full w-full object-cover" /> : <UserCircle2 size={20} />}
               </div>
-              <div className={`max-w-[82%] sm:max-w-[78%] relative ${isMine ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
+              <div className={`max-w-[82%] sm:max-w-[78%] ${isMine ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
                 <div
-                  className={`relative rounded-2xl px-3 py-2 shadow-sm border ${
+                  className={`rounded-2xl px-3 py-2 shadow-sm border ${
                     isMine
                       ? 'bg-[linear-gradient(135deg,#ff7fa4,#ff4f7a)] text-white border-rose-300/50'
                       : 'bg-white/95 text-gray-800 border-rose-100'
                   }`}
                 >
-                  <span
-                    aria-hidden
-                    className={`absolute top-3 h-2.5 w-2.5 rotate-45 border-b border-r ${
-                      isMine
-                        ? '-right-1.5 bg-[linear-gradient(135deg,#ff7fa4,#ff4f7a)] border-rose-300/50'
-                        : '-left-1.5 bg-white/95 border-rose-100'
-                    }`}
-                  />
-
                   {message.type === 'text' && <p className="whitespace-pre-wrap break-words text-[15px]">{message.content}</p>}
 
                   {message.type === 'emoji' && message.url && (
@@ -551,14 +655,25 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 px-1 text-[10px] text-gray-400">
-                  <span>{new Date(message.createdAt).toLocaleTimeString()}</span>
-                  {isPrivate && message.destructAt && leftSeconds > 0 && (
-                    <span className="ios-chip ios-chip-danger !py-0 !px-2 !text-[10px] inline-flex items-center gap-1">
-                      <Clock3 size={10} /> {leftSeconds}s
-                    </span>
-                  )}
-                </div>
+                {showMetaRow && (
+                  <div className={`flex items-center gap-2 px-1 text-[10px] ${isMine ? 'justify-end' : ''}`}>
+                    {isLatestMine && (
+                      <span
+                        className={`${
+                          message._id.startsWith('local-') ? 'text-gray-400' : isReadByPeer ? 'text-rose-500' : 'text-gray-400'
+                        }`}
+                      >
+                        {readStatusLabel}
+                      </span>
+                    )}
+
+                    {isPrivate && message.destructAt && leftSeconds > 0 && (
+                      <span className="ios-chip ios-chip-danger !py-0 !px-2 !text-[10px] inline-flex items-center gap-1">
+                        <Clock3 size={10} /> {leftSeconds}s
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {message.type === 'image' && message.fileId && (
                   <button

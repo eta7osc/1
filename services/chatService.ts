@@ -14,6 +14,8 @@ export interface Message {
   url?: string
   privateMedia?: boolean
   selfDestructSeconds?: number
+  readByMeAt?: string
+  readByHerAt?: string
   viewedAt?: string
   destructAt?: string
 }
@@ -80,6 +82,8 @@ function normalizeMessage(raw: any): Message {
     createdAt: normalizeDate(raw?.createdAt),
     privateMedia: Boolean(raw?.privateMedia),
     selfDestructSeconds: Number.isFinite(raw?.selfDestructSeconds) ? Number(raw.selfDestructSeconds) : undefined,
+    readByMeAt: raw?.readByMeAt ? normalizeDate(raw.readByMeAt) : undefined,
+    readByHerAt: raw?.readByHerAt ? normalizeDate(raw.readByHerAt) : undefined,
     viewedAt: raw?.viewedAt ? normalizeDate(raw.viewedAt) : undefined,
     destructAt: raw?.destructAt ? normalizeDate(raw.destructAt) : undefined
   }
@@ -142,6 +146,13 @@ function isMessageExpired(message: Message) {
   return new Date(message.destructAt).getTime() <= Date.now()
 }
 
+function createSelfReadPayload(senderId: Sender) {
+  const now = new Date()
+  return senderId === 'me'
+    ? { readByMeAt: now, readByHerAt: null as Date | null }
+    : { readByMeAt: null as Date | null, readByHerAt: now }
+}
+
 async function uploadMediaFile(file: File, folder: string) {
   const storage = getStorage()
   const ext = file.name.split('.').pop() || 'bin'
@@ -201,6 +212,7 @@ export async function sendTextMessage(senderId: Sender, content: string) {
     senderId,
     type: 'text',
     content: text,
+    ...createSelfReadPayload(senderId),
     createdAt: new Date()
   })
 }
@@ -223,6 +235,7 @@ export async function sendFileMessage(senderId: Sender, file: File, options: Sen
     fileId,
     privateMedia,
     selfDestructSeconds,
+    ...createSelfReadPayload(senderId),
     viewedAt: null,
     destructAt: null,
     createdAt: new Date()
@@ -242,6 +255,30 @@ export async function markPrivateMessageViewed(message: Message): Promise<void> 
     viewedAt: new Date(now),
     destructAt: new Date(now + message.selfDestructSeconds * 1000)
   })
+}
+
+function getReaderField(readerId: Sender) {
+  return readerId === 'me' ? 'readByMeAt' : 'readByHerAt'
+}
+
+export async function markMessagesRead(readerId: Sender, messageIds: string[]): Promise<void> {
+  const uniqueIds = Array.from(new Set(messageIds.filter(Boolean)))
+  if (uniqueIds.length === 0) {
+    return
+  }
+
+  await ensureLogin()
+  const db = app.database()
+  const readField = getReaderField(readerId)
+  const now = new Date()
+
+  for (const id of uniqueIds) {
+    try {
+      await db.collection(MESSAGE_COLLECTION).doc(id).update({ [readField]: now })
+    } catch {
+      // Ignore single-message failures, next poll will retry.
+    }
+  }
 }
 
 export async function fetchEmojiPacks(limit = 80): Promise<EmojiPackItem[]> {
@@ -305,6 +342,7 @@ export async function sendEmojiMessage(senderId: Sender, fileId: string) {
     senderId,
     type: 'emoji',
     fileId,
+    ...createSelfReadPayload(senderId),
     createdAt: new Date()
   })
 }
