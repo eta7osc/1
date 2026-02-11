@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { KeyRound, LogIn, MessageSquareText, ShieldCheck, Smartphone } from 'lucide-react'
 import { loginBySmsOrPassword, registerBySms, sendPhoneSmsCode } from '../services/authService'
 
@@ -21,7 +21,22 @@ const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthed }) => {
   const [error, setError] = useState('')
   const [hint, setHint] = useState('')
 
-  const canSendCode = countdown <= 0 && !sendingCode
+  const countdownTimerRef = useRef<number | null>(null)
+
+  const clearCountdown = useCallback(() => {
+    if (countdownTimerRef.current) {
+      window.clearInterval(countdownTimerRef.current)
+      countdownTimerRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      clearCountdown()
+    }
+  }, [clearCountdown])
+
+  const canSendCode = countdown <= 0 && !sendingCode && Boolean(phoneNumber.trim())
 
   const submitText = useMemo(() => {
     if (submitting) {
@@ -30,18 +45,20 @@ const AuthGateway: React.FC<AuthGatewayProps> = ({ onAuthed }) => {
     return mode === 'login' ? '立即登录' : '注册并登录'
   }, [mode, submitting])
 
-  const startCountdown = () => {
+  const startCountdown = useCallback(() => {
+    clearCountdown()
     setCountdown(COUNTDOWN_SECONDS)
-    const timer = window.setInterval(() => {
+
+    countdownTimerRef.current = window.setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
-          clearInterval(timer)
+          clearCountdown()
           return 0
         }
         return prev - 1
       })
     }, 1000)
-  }
+  }, [clearCountdown])
 
   const handleSendCode = async () => {
     if (!canSendCode) {

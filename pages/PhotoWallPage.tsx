@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Eye, Heart, ImagePlus, Lock, Video } from 'lucide-react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Eye, Heart, ImagePlus, Images, Lock, Shield, Video } from 'lucide-react'
 import type { Sender } from '../services/chatService'
 import { createWallItem, fetchWallItems, WallItem } from '../services/photoWallService'
 import {
@@ -175,10 +175,13 @@ const PhotoWallPage: React.FC<PhotoWallPageProps> = ({ currentSender }) => {
   }
 
   const currentItems = tab === 'private' ? privateItems : publicItems
+  const uploadDisabled = tab === 'private' && !privateUnlocked
+
+  const tabLabel = useMemo(() => (tab === 'public' ? '公共墙' : '私密墙'), [tab])
 
   return (
     <div className="ios-page ios-scroll ios-safe-top page-stack space-y-3">
-      <div className="ios-card p-4 space-y-3 bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(255,237,244,0.9))]">
+      <div className="ios-card p-4 space-y-3 bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(255,237,244,0.9))] ios-card-interactive">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="ios-title text-2xl">照片墙</h2>
@@ -187,9 +190,30 @@ const PhotoWallPage: React.FC<PhotoWallPageProps> = ({ currentSender }) => {
               <Heart size={11} /> 回忆收藏馆
             </div>
           </div>
-          <button type="button" className="ios-button-primary h-10 w-10 flex items-center justify-center" onClick={() => setShowUploadSheet(true)}>
+          <button
+            type="button"
+            className="ios-button-primary h-10 w-10 flex items-center justify-center disabled:opacity-50"
+            onClick={() => setShowUploadSheet(true)}
+            disabled={uploadDisabled}
+            title={uploadDisabled ? '请先解锁私密墙' : '上传内容'}
+          >
             <ImagePlus size={18} />
           </button>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="ios-card-flat py-2">
+            <p className="text-[11px] text-gray-500">公共墙</p>
+            <p className="text-base font-semibold text-gray-800 mt-1">{publicItems.length}</p>
+          </div>
+          <div className="ios-card-flat py-2">
+            <p className="text-[11px] text-gray-500">私密墙</p>
+            <p className="text-base font-semibold text-gray-800 mt-1">{privateItems.length}</p>
+          </div>
+          <div className="ios-card-flat py-2">
+            <p className="text-[11px] text-gray-500">当前分区</p>
+            <p className="text-base font-semibold text-gray-800 mt-1">{tabLabel}</p>
+          </div>
         </div>
 
         <div className="ios-segment w-full sm:w-auto">
@@ -200,6 +224,13 @@ const PhotoWallPage: React.FC<PhotoWallPageProps> = ({ currentSender }) => {
             私密墙
           </button>
         </div>
+
+        {tab === 'private' && (
+          <div className="text-xs text-gray-500 inline-flex items-center gap-1">
+            <Shield size={13} className={privateUnlocked ? 'text-emerald-500' : 'text-amber-500'} />
+            {privateUnlocked ? '私密墙当前已解锁' : '私密墙尚未解锁'}
+          </div>
+        )}
       </div>
 
       {loading && <div className="text-center text-sm text-gray-400">加载中...</div>}
@@ -207,7 +238,7 @@ const PhotoWallPage: React.FC<PhotoWallPageProps> = ({ currentSender }) => {
       {hint && <div className="text-center text-sm text-emerald-600">{hint}</div>}
 
       {tab === 'private' && (
-        <div className="ios-card p-5 space-y-4">
+        <div className="ios-card p-5 space-y-4 ios-card-interactive">
           {!privateUnlocked && (
             <>
               <div className="flex items-center gap-2 text-gray-700">
@@ -271,11 +302,18 @@ const PhotoWallPage: React.FC<PhotoWallPageProps> = ({ currentSender }) => {
 
       {(tab === 'public' || privateUnlocked) && (
         <>
-          {currentItems.length === 0 && <div className="ios-card p-5 text-sm text-gray-500 text-center">还没有内容，点击右上角上传。</div>}
+          {currentItems.length === 0 && (
+            <div className="ios-card p-6 text-sm text-gray-500 text-center space-y-2">
+              <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-400">
+                <Images size={22} />
+              </div>
+              <p>{tab === 'public' ? '公共墙还没有内容，点击右上角上传。' : '私密墙还没有内容，上传第一张回忆吧。'}</p>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
             {currentItems.map(item => (
-              <div key={item._id} className="ios-card-flat overflow-hidden bg-white">
+              <div key={item._id} className="ios-card-flat overflow-hidden bg-white ios-card-interactive">
                 <div className="aspect-[3/4] bg-gray-100">
                   {item.type === 'video' ? (
                     <video src={item.url} controls className="w-full h-full object-cover" />

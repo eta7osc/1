@@ -1,13 +1,18 @@
-﻿import cloudbase from '@cloudbase/js-sdk'
+import cloudbase from '@cloudbase/js-sdk'
 
 const envId = import.meta.env.VITE_CLOUDBASE_ENV_ID
 const hasEnvId = typeof envId === 'string' && envId.trim().length > 0
+const MISSING_ENV_PLACEHOLDER = '__missing_cloudbase_env__'
 
 if (!hasEnvId) {
   console.warn('[CloudBase] Missing VITE_CLOUDBASE_ENV_ID, CloudBase calls will fail until it is configured.')
 }
 
-export const app = cloudbase.init(hasEnvId ? { env: envId } : {})
+const appConfig: Parameters<typeof cloudbase.init>[0] = {
+  env: hasEnvId ? envId.trim() : MISSING_ENV_PLACEHOLDER
+}
+
+export const app = cloudbase.init(appConfig)
 
 const authInstance = hasEnvId ? app.auth({ persistence: 'local' }) : null
 export const auth = authInstance
@@ -29,16 +34,51 @@ function assertCloudBaseReady() {
   }
 }
 
-export async function ensureLogin() {
-  assertCloudBaseReady()
+function toErrorMessage(value: unknown) {
+  if (!value) {
+    return ''
+  }
+  if (typeof value === 'string') {
+    return value
+  }
+  if (value instanceof Error) {
+    return value.message
+  }
 
-  const loginState = await authInstance.getLoginState()
+  const maybeObj = value as any
+  return maybeObj?.message || maybeObj?.error_description || maybeObj?.msg || maybeObj?.code || ''
+}
+
+function getReadyAuth() {
+  assertCloudBaseReady()
+  return authInstance as NonNullable<typeof authInstance>
+}
+
+export async function ensureLogin() {
+  const readyAuth = getReadyAuth()
+
+  const loginState = await readyAuth.getLoginState()
   if (loginState) {
     return loginState
   }
 
-  const res = await authInstance.signInAnonymously()
-  return res.loginState
+  const signInRes = await readyAuth.signInAnonymously()
+  const signInError = (signInRes as any)?.error
+  if (signInError) {
+    throw new Error(toErrorMessage(signInError) || 'CloudBase 匿名登录失败，请稍后重试')
+  }
+
+  const refreshedState = await readyAuth.getLoginState()
+  if (refreshedState) {
+    return refreshedState
+  }
+
+  const signInUser = (signInRes as any)?.data?.user
+  if (signInUser) {
+    return { user: signInUser }
+  }
+
+  throw new Error('CloudBase 登录状态不可用，请稍后重试')
 }
 
 export async function getCurrentUid(): Promise<string> {

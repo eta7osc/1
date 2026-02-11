@@ -1,15 +1,20 @@
-
-import { STORAGE_KEYS } from '../constants';
-
 export const storage = {
   get: <T,>(key: string, defaultValue: T): T => {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : defaultValue;
+    const data = localStorage.getItem(key)
+    if (data === null) {
+      return defaultValue
+    }
+
+    try {
+      return JSON.parse(data) as T
+    } catch {
+      return defaultValue
+    }
   },
-  set: (key: string, value: any): void => {
-    localStorage.setItem(key, JSON.stringify(value));
+  set: (key: string, value: unknown): void => {
+    localStorage.setItem(key, JSON.stringify(value))
   },
   remove: (key: string): void => {
-    localStorage.removeItem(key);
+    localStorage.removeItem(key)
   }
-};
+}

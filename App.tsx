@@ -1,4 +1,4 @@
-﻿import React, { Suspense, lazy, useEffect, useState } from 'react'
+import React, { Suspense, lazy, useEffect, useState } from 'react'
 import { HashRouter as Router, Navigate, NavLink, Route, Routes } from 'react-router-dom'
 import { CalendarClock, Camera, House, MessageCircle, UserCircle2 } from 'lucide-react'
 import PasscodeLock from './components/PasscodeLock'
@@ -13,54 +13,41 @@ const HomePage = lazy(() => import('./pages/HomePage'))
 const PhotoWallPage = lazy(() => import('./pages/PhotoWallPage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
 
+const tabs = [
+  { to: '/', label: '聊天', icon: MessageCircle },
+  { to: '/anniversary', label: '纪念日', icon: CalendarClock },
+  { to: '/home', label: '家园', icon: House },
+  { to: '/photos', label: '照片墙', icon: Camera },
+  { to: '/profile', label: '主页', icon: UserCircle2 }
+]
+
+const LoadingState: React.FC<{ label: string; fullscreen?: boolean }> = ({ label, fullscreen = true }) => (
+  <div className={`ios-page ${fullscreen ? 'min-h-screen' : 'h-full min-h-0'} flex items-center justify-center px-5`}>
+    <div className="ios-card w-full max-w-xs p-6 text-center">
+      <div className="ios-spinner mx-auto" />
+      <p className="text-sm text-gray-500 mt-3">{label}</p>
+    </div>
+  </div>
+)
+
 const TabBar: React.FC = () => (
-  <nav className="ios-tabbar ios-blur ios-safe-bottom">
-    <div className="flex justify-around items-center px-1.5 pt-2 pb-2">
-      <NavLink
-        to="/"
-        className={({ isActive }) =>
-          `ios-tab-item flex flex-col items-center gap-1 transition-colors ${isActive ? 'active text-rose-500' : 'text-gray-400'}`
-        }
-      >
-        <MessageCircle size={22} />
-        <span className="text-[10px] font-semibold">聊天</span>
-      </NavLink>
-      <NavLink
-        to="/anniversary"
-        className={({ isActive }) =>
-          `ios-tab-item flex flex-col items-center gap-1 transition-colors ${isActive ? 'active text-rose-500' : 'text-gray-400'}`
-        }
-      >
-        <CalendarClock size={22} />
-        <span className="text-[10px] font-semibold">纪念日</span>
-      </NavLink>
-      <NavLink
-        to="/home"
-        className={({ isActive }) =>
-          `ios-tab-item flex flex-col items-center gap-1 transition-colors ${isActive ? 'active text-rose-500' : 'text-gray-400'}`
-        }
-      >
-        <House size={22} />
-        <span className="text-[10px] font-semibold">家园</span>
-      </NavLink>
-      <NavLink
-        to="/photos"
-        className={({ isActive }) =>
-          `ios-tab-item flex flex-col items-center gap-1 transition-colors ${isActive ? 'active text-rose-500' : 'text-gray-400'}`
-        }
-      >
-        <Camera size={22} />
-        <span className="text-[10px] font-semibold">照片墙</span>
-      </NavLink>
-      <NavLink
-        to="/profile"
-        className={({ isActive }) =>
-          `ios-tab-item flex flex-col items-center gap-1 transition-colors ${isActive ? 'active text-rose-500' : 'text-gray-400'}`
-        }
-      >
-        <UserCircle2 size={22} />
-        <span className="text-[10px] font-semibold">主页</span>
-      </NavLink>
+  <nav className="ios-tabbar ios-blur ios-safe-bottom" aria-label="主导航">
+    <div className="grid grid-cols-5 items-center gap-1 px-2 pt-2 pb-2">
+      {tabs.map(tab => {
+        const Icon = tab.icon
+        return (
+          <NavLink
+            key={tab.to}
+            to={tab.to}
+            className={({ isActive }) =>
+              `ios-tab-item flex flex-col items-center justify-center gap-1 transition-all ${isActive ? 'active text-rose-600' : 'text-gray-400'}`
+            }
+          >
+            <Icon size={20} />
+            <span className="text-[10px] font-semibold tracking-[0.02em]">{tab.label}</span>
+          </NavLink>
+        )
+      })}
     </div>
   </nav>
 )
@@ -144,7 +131,7 @@ const AppContent: React.FC = () => {
       }
     }
 
-    bootstrap()
+    void bootstrap()
 
     return () => {
       active = false
@@ -152,7 +139,7 @@ const AppContent: React.FC = () => {
   }, [accountRetrySeed, isLocked, phoneAuthed])
 
   if (authLoading) {
-    return <div className="ios-page min-h-screen flex items-center justify-center text-gray-500">登录状态检查中...</div>
+    return <LoadingState label="登录状态检查中..." />
   }
 
   if (!phoneAuthed) {
@@ -164,7 +151,7 @@ const AppContent: React.FC = () => {
   }
 
   if (accountLoading) {
-    return <div className="ios-page min-h-screen flex items-center justify-center text-gray-500">账号初始化中...</div>
+    return <LoadingState label="账号初始化中..." />
   }
 
   if (!account) {
@@ -184,7 +171,7 @@ const AppContent: React.FC = () => {
               setPhoneAuthed(false)
               setAccount(null)
               setAvatarMap({})
-              setIsLocked(appLockEnabled)
+              setIsLocked(getAppLockEnabled())
               setStartupError('')
             }}
           >
@@ -207,8 +194,8 @@ const AppContent: React.FC = () => {
 
       <div className="ios-app-frame ios-page flex min-h-screen flex-col overflow-hidden relative z-10">
         <main className="flex-1 min-h-0 overflow-hidden flex">
-          <Suspense fallback={<div className="h-full flex items-center justify-center text-gray-500">加载中...</div>}>
-            <div className="flex-1 min-h-0">
+          <Suspense fallback={<LoadingState label="页面加载中..." fullscreen={false} />}>
+            <div className="flex-1 min-h-0 ios-route-frame">
               <Routes>
                 <Route
                   path="/"
@@ -252,7 +239,7 @@ const AppContent: React.FC = () => {
                         setPhoneAuthed(false)
                         setAccount(null)
                         setAvatarMap({})
-                        setIsLocked(appLockEnabled)
+                        setIsLocked(getAppLockEnabled())
                       }}
                     />
                   }

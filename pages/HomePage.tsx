@@ -1,5 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Heart, Image as ImageIcon, MessageCircle, Plus, Send, Sparkles, UserCircle2, Video, X } from 'lucide-react'
+import {
+  ChartNoAxesCombined,
+  Heart,
+  Image as ImageIcon,
+  MessageCircle,
+  Plus,
+  Send,
+  Sparkles,
+  UserCircle2,
+  Video,
+  X
+} from 'lucide-react'
 import type { Sender } from '../services/chatService'
 import { addHomeComment, createHomePost, fetchHomePosts, HomePost, toggleHomeLike } from '../services/homeService'
 
@@ -26,6 +37,34 @@ function getImageGridClass(count: number) {
   if (count === 1) return 'grid-cols-1'
   if (count === 2 || count === 4) return 'grid-cols-2'
   return 'grid-cols-3'
+}
+
+function formatRelativeTime(iso: string) {
+  const time = new Date(iso)
+  if (Number.isNaN(time.getTime())) {
+    return '--'
+  }
+
+  const now = Date.now()
+  const diffMs = now - time.getTime()
+  const minute = 60 * 1000
+  const hour = 60 * minute
+  const day = 24 * hour
+
+  if (diffMs < minute) {
+    return '刚刚'
+  }
+  if (diffMs < hour) {
+    return `${Math.floor(diffMs / minute)} 分钟前`
+  }
+  if (diffMs < day) {
+    return `${Math.floor(diffMs / hour)} 小时前`
+  }
+  if (diffMs < day * 7) {
+    return `${Math.floor(diffMs / day)} 天前`
+  }
+
+  return time.toLocaleDateString()
 }
 
 const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
@@ -87,12 +126,13 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
   }, [loadPosts])
 
   const handleSelectFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
+    const fileList = e.target.files
     e.target.value = ''
-    if (files.length === 0) {
+    if (!fileList || fileList.length === 0) {
       return
     }
 
+    const files: File[] = Array.from(fileList)
     const currentImages = draftFiles.filter(item => item.type === 'image').length
     const currentVideos = draftFiles.filter(item => item.type === 'video').length
     const nextImages = files.filter(file => file.type.startsWith('image/')).length
@@ -197,9 +237,23 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
   const draftImageCount = draftFiles.filter(item => item.type === 'image').length
   const draftVideoCount = draftFiles.filter(item => item.type === 'video').length
 
+  const mediaCount = useMemo(() => posts.reduce((sum, post) => sum + post.media.length, 0), [posts])
+  const todayCount = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    return posts.filter(post => {
+      const createdAt = new Date(post.createdAt)
+      if (Number.isNaN(createdAt.getTime())) {
+        return false
+      }
+      return createdAt.getTime() >= today.getTime()
+    }).length
+  }, [posts])
+
   return (
     <div className="ios-page ios-scroll ios-safe-top page-stack space-y-3">
-      <div className="ios-card p-4 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(255,237,244,0.9))]">
+      <div className="ios-card p-4 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(255,237,244,0.9))] ios-card-interactive">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="ios-title text-2xl">家园</h2>
@@ -223,10 +277,44 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
         </div>
       </div>
 
-      {loading && <div className="text-center text-sm text-gray-400">加载中...</div>}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="ios-card-flat px-3 py-2.5">
+          <p className="text-[11px] text-gray-500">动态总数</p>
+          <p className="text-base font-semibold text-gray-800 mt-1">{posts.length}</p>
+        </div>
+        <div className="ios-card-flat px-3 py-2.5">
+          <p className="text-[11px] text-gray-500">媒体文件</p>
+          <p className="text-base font-semibold text-gray-800 mt-1">{mediaCount}</p>
+        </div>
+        <div className="ios-card-flat px-3 py-2.5">
+          <p className="text-[11px] text-gray-500">今日更新</p>
+          <p className="text-base font-semibold text-gray-800 mt-1">{todayCount}</p>
+        </div>
+      </div>
+
+      {loading && posts.length === 0 && (
+        <div className="space-y-3">
+          {Array.from({ length: 2 }).map((_, index) => (
+            <div key={index} className="ios-card p-4">
+              <div className="ios-skeleton h-4 w-1/3 rounded-full" />
+              <div className="ios-skeleton h-4 w-full rounded-full mt-4" />
+              <div className="ios-skeleton h-4 w-4/5 rounded-full mt-2" />
+              <div className="ios-skeleton h-24 w-full rounded-2xl mt-3" />
+            </div>
+          ))}
+        </div>
+      )}
+
       {error && <div className="text-center text-sm text-red-500">{error}</div>}
 
-      {!loading && posts.length === 0 && <div className="ios-card p-5 text-sm text-gray-500 text-center">还没有动态，发布第一条甜蜜日常吧。</div>}
+      {!loading && posts.length === 0 && (
+        <div className="ios-card p-6 text-sm text-gray-500 text-center space-y-2">
+          <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-400">
+            <ChartNoAxesCombined size={22} />
+          </div>
+          <p>还没有动态，发布第一条甜蜜日常吧。</p>
+        </div>
+      )}
 
       <div className="space-y-3">
         {posts.map(post => {
@@ -236,7 +324,7 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
           const videoMedia = post.media.filter(media => media.type === 'video')
 
           return (
-            <article key={post._id} className="ios-card p-4 space-y-3">
+            <article key={post._id} className="ios-card p-4 space-y-3 ios-card-interactive">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="h-9 w-9 rounded-full overflow-hidden bg-rose-100 text-rose-400 border border-rose-200/80 flex items-center justify-center shrink-0">
@@ -244,7 +332,7 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
                   </div>
                   <div className="ios-chip ios-chip-info">{roleLabel(post.authorId)}</div>
                 </div>
-                <span className="text-xs ios-soft-text shrink-0">{new Date(post.createdAt).toLocaleString()}</span>
+                <span className="text-xs ios-soft-text shrink-0">{formatRelativeTime(post.createdAt)}</span>
               </div>
 
               <div className="text-[11px] text-rose-400">仅你们彼此可见</div>
@@ -340,7 +428,9 @@ const HomePage: React.FC<HomePageProps> = ({ currentSender, avatarMap }) => {
               value={content}
               onChange={e => setContent(e.target.value)}
               placeholder="记录今天的点滴..."
+              maxLength={300}
             />
+            <div className="text-right text-[11px] text-gray-400">{content.length}/300</div>
 
             {draftFiles.length > 0 && (
               <div className="grid grid-cols-3 gap-2">

@@ -79,6 +79,15 @@ select {
   box-shadow: var(--ios-shadow);
 }
 
+.ios-card-interactive {
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+
+.ios-card-interactive:active {
+  transform: scale(0.995);
+  box-shadow: var(--ios-shadow-soft);
+}
+
 .ios-card-flat {
   background: var(--ios-bg-elevated);
   border-radius: 16px;
@@ -180,17 +189,43 @@ select {
   position: sticky;
   bottom: 0;
   z-index: 60;
-  border-top: 1px solid var(--ios-border);
+  border-top: 1px solid rgba(255, 255, 255, 0.75);
+  background: linear-gradient(180deg, rgba(255, 248, 251, 0.75), rgba(255, 245, 249, 0.92));
+  box-shadow: 0 -8px 28px rgba(171, 86, 123, 0.12);
 }
 
 .ios-tab-item {
   min-width: 58px;
-  border-radius: 12px;
-  padding: 6px 4px;
+  border-radius: 15px;
+  padding: 7px 4px;
+  position: relative;
+  transform: translateY(0);
+  transition: all 0.2s ease;
+}
+
+.ios-tab-item svg {
+  transition: transform 0.2s ease;
 }
 
 .ios-tab-item.active {
-  background: rgba(255, 79, 122, 0.1);
+  background: linear-gradient(160deg, rgba(255, 115, 156, 0.2), rgba(255, 79, 122, 0.08));
+  transform: translateY(-2px);
+}
+
+.ios-tab-item.active svg {
+  transform: scale(1.08);
+}
+
+.ios-tab-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  width: 14px;
+  height: 3px;
+  border-radius: 999px;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #ff5f8a, #ff3f75);
 }
 
 .ios-chip {
@@ -380,6 +415,56 @@ select {
 
 .auth-input-wrap .ios-input {
   padding-left: 34px;
+}
+
+.ios-route-frame {
+  height: 100%;
+  animation: ios-route-fade 0.22s ease;
+}
+
+@keyframes ios-route-fade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ios-spinner {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 2.5px solid rgba(255, 79, 122, 0.24);
+  border-top-color: rgba(255, 79, 122, 0.92);
+  animation: ios-spin 0.9s linear infinite;
+}
+
+@keyframes ios-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ios-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(90deg, rgba(236, 228, 233, 0.55), rgba(249, 244, 247, 0.9), rgba(236, 228, 233, 0.55));
+  background-size: 200% 100%;
+  animation: ios-skeleton-shimmer 1.2s ease infinite;
+}
+
+@keyframes ios-skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
 }
 
 .page-stack {
