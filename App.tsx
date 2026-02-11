@@ -148,7 +148,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ account, onRebind, onProfil
   }
 
   return (
-    <div className="ios-page px-4 pb-32 ios-safe-top ios-scroll">
+    <div className="ios-page ios-safe-top ios-scroll page-stack">
       <div className="ios-card p-5 space-y-5">
         <div>
           <h2 className="ios-title text-2xl">设置</h2>
@@ -213,38 +213,48 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ account, onRebind, onProfil
 
 const TabBar: React.FC = () => (
   <nav className="ios-tabbar ios-blur ios-safe-bottom">
-    <div className="flex justify-around items-center pt-2 pb-2">
+    <div className="flex justify-around items-center px-1.5 pt-2 pb-2">
       <NavLink
         to="/"
-        className={({ isActive }) => `flex flex-col items-center gap-1 py-1 transition-colors ${isActive ? 'text-rose-500' : 'text-gray-400'}`}
+        className={({ isActive }) =>
+          `ios-tab-item flex flex-col items-center gap-1 transition-colors ${isActive ? 'active text-rose-500' : 'text-gray-400'}`
+        }
       >
         <MessageCircle size={22} />
         <span className="text-[10px] font-semibold">聊天</span>
       </NavLink>
       <NavLink
         to="/anniversary"
-        className={({ isActive }) => `flex flex-col items-center gap-1 py-1 transition-colors ${isActive ? 'text-rose-500' : 'text-gray-400'}`}
+        className={({ isActive }) =>
+          `ios-tab-item flex flex-col items-center gap-1 transition-colors ${isActive ? 'active text-rose-500' : 'text-gray-400'}`
+        }
       >
         <CalendarClock size={22} />
         <span className="text-[10px] font-semibold">纪念日</span>
       </NavLink>
       <NavLink
         to="/home"
-        className={({ isActive }) => `flex flex-col items-center gap-1 py-1 transition-colors ${isActive ? 'text-rose-500' : 'text-gray-400'}`}
+        className={({ isActive }) =>
+          `ios-tab-item flex flex-col items-center gap-1 transition-colors ${isActive ? 'active text-rose-500' : 'text-gray-400'}`
+        }
       >
         <House size={22} />
         <span className="text-[10px] font-semibold">家园</span>
       </NavLink>
       <NavLink
         to="/photos"
-        className={({ isActive }) => `flex flex-col items-center gap-1 py-1 transition-colors ${isActive ? 'text-rose-500' : 'text-gray-400'}`}
+        className={({ isActive }) =>
+          `ios-tab-item flex flex-col items-center gap-1 transition-colors ${isActive ? 'active text-rose-500' : 'text-gray-400'}`
+        }
       >
         <Camera size={22} />
         <span className="text-[10px] font-semibold">照片墙</span>
       </NavLink>
       <NavLink
         to="/settings"
-        className={({ isActive }) => `flex flex-col items-center gap-1 py-1 transition-colors ${isActive ? 'text-rose-500' : 'text-gray-400'}`}
+        className={({ isActive }) =>
+          `ios-tab-item flex flex-col items-center gap-1 transition-colors ${isActive ? 'active text-rose-500' : 'text-gray-400'}`
+        }
       >
         <Settings size={22} />
         <span className="text-[10px] font-semibold">设置</span>

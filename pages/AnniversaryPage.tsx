@@ -108,7 +108,7 @@ const AnniversaryPage: React.FC<AnniversaryPageProps> = ({ currentSender }) => {
   }
 
   return (
-    <div className="ios-page ios-scroll px-4 pb-32 ios-safe-top space-y-4">
+    <div className="ios-page ios-scroll ios-safe-top page-stack space-y-3">
       <div className="ios-card p-4 bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(255,237,244,0.9))]">
         <div className="flex items-center justify-between">
           <div>
@@ -166,8 +166,8 @@ const AnniversaryPage: React.FC<AnniversaryPageProps> = ({ currentSender }) => {
       </div>
 
       {showAdd && (
-        <div className="fixed inset-0 z-50 bg-black/35 flex items-end p-4">
-          <div className="ios-card w-full p-5 space-y-4 animate__animated animate__slideInUp">
+        <div className="fixed inset-0 z-50 bg-black/35 flex items-end p-3" onClick={() => setShowAdd(false)}>
+          <div className="ios-card w-full p-5 space-y-4 animate__animated animate__slideInUp sheet-container" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h3 className="ios-title text-lg">新增纪念日</h3>
               <button type="button" className="text-sm text-gray-500" onClick={() => setShowAdd(false)}>

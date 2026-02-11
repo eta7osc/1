@@ -143,8 +143,8 @@ const PhotoWallPage: React.FC<PhotoWallPageProps> = ({ currentSender }) => {
   const currentItems = tab === 'private' ? privateItems : publicItems
 
   return (
-    <div className="ios-page ios-scroll px-4 pb-32 ios-safe-top space-y-4">
-      <div className="ios-card p-4 space-y-4 bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(255,237,244,0.9))]">
+    <div className="ios-page ios-scroll ios-safe-top page-stack space-y-3">
+      <div className="ios-card p-4 space-y-3 bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(255,237,244,0.9))]">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="ios-title text-2xl">照片墙</h2>
@@ -158,7 +158,7 @@ const PhotoWallPage: React.FC<PhotoWallPageProps> = ({ currentSender }) => {
           </button>
         </div>
 
-        <div className="ios-segment">
+        <div className="ios-segment w-full sm:w-auto">
           <button type="button" className={tab === 'public' ? 'is-active' : ''} onClick={() => setTab('public')}>
             公共墙
           </button>
@@ -199,7 +199,7 @@ const PhotoWallPage: React.FC<PhotoWallPageProps> = ({ currentSender }) => {
         <>
           {currentItems.length === 0 && <div className="ios-card p-5 text-sm text-gray-500 text-center">还没有内容，点击右上角上传。</div>}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
             {currentItems.map(item => (
               <div key={item._id} className="ios-card-flat overflow-hidden bg-white">
                 <div className="aspect-[3/4] bg-gray-100">
@@ -209,7 +209,7 @@ const PhotoWallPage: React.FC<PhotoWallPageProps> = ({ currentSender }) => {
                     <img src={item.url} alt="wall-item" className="w-full h-full object-cover" />
                   )}
                 </div>
-                  <div className="px-3 py-2">
+                <div className="px-3 py-2">
                   <div className="flex items-center justify-between text-xs ios-soft-text">
                     <span>{item.uploaderId === 'me' ? '我' : '她'}</span>
                     <span>{new Date(item.createdAt).toLocaleDateString()}</span>
@@ -223,8 +223,8 @@ const PhotoWallPage: React.FC<PhotoWallPageProps> = ({ currentSender }) => {
       )}
 
       {showUploadSheet && (
-        <div className="fixed inset-0 z-50 bg-black/35 flex items-end p-4">
-          <div className="ios-card w-full p-5 space-y-4 animate__animated animate__slideInUp">
+        <div className="fixed inset-0 z-50 bg-black/35 flex items-end p-3" onClick={() => setShowUploadSheet(false)}>
+          <div className="ios-card w-full p-5 space-y-4 animate__animated animate__slideInUp sheet-container" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h3 className="ios-title text-lg">上传到{tab === 'private' ? '私密墙' : '公共墙'}</h3>
               <button type="button" className="text-sm text-gray-500" onClick={() => setShowUploadSheet(false)}>

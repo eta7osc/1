@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Clock3, Heart, ImagePlus, Lock, Mic, Send, SmilePlus, Square, Sticker, UserCircle2 } from 'lucide-react'
+import { Clock3, ImagePlus, Lock, Mic, Send, SmilePlus, Square, Sticker, UserCircle2 } from 'lucide-react'
 import {
   EmojiPackItem,
   fetchEmojiPacks,
@@ -458,29 +458,26 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
 
   return (
     <div className="ios-page h-full min-h-0 flex flex-col">
-      <header className="ios-blur ios-safe-top px-4 pb-3 border-b border-white/70 shrink-0">
-        <div className="flex items-center justify-between">
-          <div>
+      <header className="ios-blur ios-safe-top px-3 sm:px-4 pb-3 border-b border-white/70 shrink-0">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <h1 className="ios-title text-xl">Lover&apos;s Secret</h1>
             <p className="text-xs ios-soft-text mt-0.5">当前账号：{currentUserLabel}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <div className="h-9 w-9 rounded-full overflow-hidden bg-rose-100 text-rose-400 flex items-center justify-center border border-rose-200/80">
               {currentUserAvatar ? <img src={currentUserAvatar} alt="my-avatar" className="h-full w-full object-cover" /> : <UserCircle2 size={24} />}
             </div>
             <span className="ios-chip ios-chip-pink">私密聊天</span>
-            <span className="ios-feature-badge">
-              <Heart size={11} /> 两人专属
-            </span>
           </div>
         </div>
-        <div className="mt-3 flex items-center justify-between text-[11px] ios-soft-text">
+        <div className="mt-2 flex items-center justify-between gap-2 text-[11px] ios-soft-text">
           <span>只属于你们的加密日常</span>
           <span className={privateMode ? 'text-rose-500 font-semibold' : ''}>{privateMode ? '私密媒体已开启' : '私密媒体已关闭'}</span>
         </div>
       </header>
 
-      <main className="flex-1 min-h-0 ios-scroll px-3 py-3 space-y-2 ios-chat-bg">
+      <main className="flex-1 min-h-0 ios-scroll px-2.5 sm:px-3 py-3 space-y-2 ios-chat-bg">
         {loading && activeMessages.length === 0 && <div className="text-center text-xs text-gray-400">正在加载聊天记录...</div>}
         {!loading && activeMessages.length === 0 && <div className="text-center text-xs text-gray-400">还没有消息，发一条试试</div>}
 
@@ -496,7 +493,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
               <div className="h-9 w-9 rounded-full overflow-hidden bg-rose-100 text-rose-400 border border-rose-200/80 shrink-0 flex items-center justify-center">
                 {avatarUrl ? <img src={avatarUrl} alt="chat-avatar" className="h-full w-full object-cover" /> : <UserCircle2 size={20} />}
               </div>
-              <div className={`max-w-[78%] relative ${isMine ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
+              <div className={`max-w-[82%] sm:max-w-[78%] relative ${isMine ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
                 <div
                   className={`rounded-2xl px-3 py-2 shadow-sm border ${
                     isMine
@@ -597,8 +594,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
         </section>
       )}
 
-      <footer className="ios-blur ios-safe-bottom border-t border-white/80 px-3 py-2 space-y-2 shrink-0">
-        <div className="flex items-center gap-2 text-xs text-gray-600">
+      <footer className="ios-blur ios-safe-bottom border-t border-white/80 px-2.5 sm:px-3 py-2 space-y-2 shrink-0">
+        <div className="flex items-center flex-wrap gap-2 text-xs text-gray-600">
           <button
             type="button"
             onClick={() => setPrivateMode(prev => !prev)}
@@ -635,7 +632,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
           </button>
 
           <input
-            className="ios-input px-3 py-2"
+            className="ios-input px-3 py-2 min-w-0 flex-1"
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -648,6 +645,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
             className={`ios-button-secondary h-10 w-10 flex items-center justify-center ${isRecording ? 'opacity-60' : ''}`}
             onClick={() => setShowEmojiPanel(prev => !prev)}
             disabled={isRecording}
+            title={showEmojiPanel ? '关闭表情面板' : '打开表情面板'}
           >
             <Sticker size={17} />
           </button>
@@ -672,8 +670,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
           </button>
         </div>
 
-        <div className="flex items-center justify-between text-[11px] text-gray-500">
-          <span>支持发送图片、长视频、最长 60 秒语音</span>
+        <div className="flex items-center justify-between gap-2 text-[11px] text-gray-500">
+          <span className="truncate">支持发送图片、长视频、最长 60 秒语音</span>
           <button type="button" className="text-rose-500 inline-flex items-center gap-1" onClick={() => emojiUploadRef.current?.click()}>
             <SmilePlus size={12} /> 导入表情
           </button>
