@@ -1,6 +1,8 @@
 import { auth } from './cloudbaseClient'
 
 const AUTH_STATUS_STORAGE_KEY = 'lovers_secret_phone_auth'
+const SMS_VERIFICATION_STORAGE_KEY = 'lovers_secret_sms_verification_v1'
+const SMS_VERIFICATION_MAX_AGE_MS = 10 * 60 * 1000
 
 export interface AuthIdentity {
   uid: string
@@ -14,30 +16,84 @@ export interface SmsLoginInput {
   password?: string
 }
 
+interface NormalizedPhone {
+  local: string
+  e164: string
+  cloudPhone: string
+}
+
+interface SmsVerificationCacheEntry {
+  verificationId: string
+  isUser: boolean
+  createdAt: number
+}
+
+type SmsVerificationCacheMap = Record<string, SmsVerificationCacheEntry>
+
 function assertAuthReady() {
   if (!auth) {
-    throw new Error('CloudBase 鉴权未就绪，请检查 VITE_CLOUDBASE_ENV_ID 配置。')
+    throw new Error('CloudBase auth is not initialized. Check VITE_CLOUDBASE_ENV_ID.')
   }
 }
 
-function normalizePhoneNumber(raw: string): string {
+function extractErrorMessage(error: unknown): string | null {
+  if (!error) {
+    return null
+  }
+  if (typeof error === 'string') {
+    return error
+  }
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+
+  const maybeObj = error as any
+  if (typeof maybeObj?.message === 'string' && maybeObj.message) {
+    return maybeObj.message
+  }
+  if (typeof maybeObj?.error_description === 'string' && maybeObj.error_description) {
+    return maybeObj.error_description
+  }
+  if (typeof maybeObj?.error_message === 'string' && maybeObj.error_message) {
+    return maybeObj.error_message
+  }
+  if (typeof maybeObj?.msg === 'string' && maybeObj.msg) {
+    return maybeObj.msg
+  }
+  if (typeof maybeObj?.error?.message === 'string' && maybeObj.error.message) {
+    return maybeObj.error.message
+  }
+
+  return null
+}
+
+function throwFriendlyError(error: unknown, fallback = 'Authentication failed. Please try again.'): never {
+  const message = extractErrorMessage(error)
+  throw new Error(message || fallback)
+}
+
+function normalizePhoneNumber(raw: string): NormalizedPhone {
   const trimmed = raw.trim()
   if (!trimmed) {
-    throw new Error('请输入手机号')
+    throw new Error('Please enter a phone number')
   }
 
   const compact = trimmed.replace(/\s+/g, '')
-  if (compact.startsWith('+')) {
-    if (!/^\+\d{6,20}$/.test(compact)) {
-      throw new Error('手机号格式不正确，请使用 +86 开头的完整号码')
-    }
-    return compact
+  let local = ''
+
+  if (/^1\d{10}$/.test(compact)) {
+    local = compact
+  } else if (/^\+?86\d{11}$/.test(compact)) {
+    local = compact.replace(/^\+?86/, '')
+  } else {
+    throw new Error('Please enter a valid Mainland China phone number')
   }
 
-  if (!/^1\d{10}$/.test(compact)) {
-    throw new Error('请输入正确的中国大陆手机号')
+  return {
+    local,
+    e164: `+86${local}`,
+    cloudPhone: `+86 ${local}`
   }
-  return `+86${compact}`
 }
 
 function parseIdentityFromState(loginState: any): AuthIdentity | null {
@@ -46,7 +102,7 @@ function parseIdentityFromState(loginState: any): AuthIdentity | null {
   }
 
   const user = loginState.user || loginState.credential || loginState
-  const uid = String(user?.uid || user?.uuid || user?.userId || loginState.uid || '')
+  const uid = String(user?.uid || user?.uuid || user?.userId || user?.id || user?.sub || loginState.uid || '')
   if (!uid) {
     return null
   }
@@ -54,12 +110,14 @@ function parseIdentityFromState(loginState: any): AuthIdentity | null {
   const isAnonymous = Boolean(
     user?.isAnonymous ||
       user?.anonymous ||
+      user?.is_anonymous ||
       user?.loginType === 'ANONYMOUS' ||
       user?.provider === 'anonymous' ||
       user?.authType === 'ANONYMOUS'
   )
 
-  const phoneNumber = typeof user?.phone_number === 'string' ? user.phone_number : typeof user?.phoneNumber === 'string' ? user.phoneNumber : undefined
+  const phoneNumber =
+    typeof user?.phone_number === 'string' ? user.phone_number : typeof user?.phoneNumber === 'string' ? user.phoneNumber : typeof user?.phone === 'string' ? user.phone : undefined
 
   return { uid, phoneNumber, isAnonymous }
 }
@@ -76,11 +134,57 @@ function readPhoneAuthFallback() {
   return localStorage.getItem(AUTH_STATUS_STORAGE_KEY) === '1'
 }
 
-function throwFriendlyError(error: unknown): never {
-  if (error instanceof Error && error.message) {
-    throw error
+function readSmsVerificationCache(): SmsVerificationCacheMap {
+  const raw = localStorage.getItem(SMS_VERIFICATION_STORAGE_KEY)
+  if (!raw) {
+    return {}
   }
-  throw new Error('认证失败，请稍后重试')
+
+  try {
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? (parsed as SmsVerificationCacheMap) : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeSmsVerificationCache(cache: SmsVerificationCacheMap) {
+  localStorage.setItem(SMS_VERIFICATION_STORAGE_KEY, JSON.stringify(cache))
+}
+
+function setSmsVerification(phoneE164: string, entry: SmsVerificationCacheEntry) {
+  const cache = readSmsVerificationCache()
+  cache[phoneE164] = entry
+  writeSmsVerificationCache(cache)
+}
+
+function clearSmsVerification(phoneE164: string) {
+  const cache = readSmsVerificationCache()
+  if (cache[phoneE164]) {
+    delete cache[phoneE164]
+    writeSmsVerificationCache(cache)
+  }
+}
+
+function getSmsVerification(phoneE164: string): SmsVerificationCacheEntry | null {
+  const cache = readSmsVerificationCache()
+  const entry = cache[phoneE164]
+  if (!entry?.verificationId) {
+    return null
+  }
+
+  if (Date.now() - entry.createdAt > SMS_VERIFICATION_MAX_AGE_MS) {
+    clearSmsVerification(phoneE164)
+    return null
+  }
+
+  return entry
+}
+
+function requireResultOk(result: any, fallback = 'Authentication failed. Please try again.') {
+  if (result && typeof result === 'object' && 'error' in result && result.error) {
+    throwFriendlyError(result.error, fallback)
+  }
 }
 
 export async function getPhoneAuthIdentity(): Promise<AuthIdentity | null> {
@@ -105,75 +209,145 @@ export async function isPhoneAuthenticated(): Promise<boolean> {
 
 export async function sendPhoneSmsCode(rawPhoneNumber: string): Promise<string> {
   assertAuthReady()
-  const phoneNumber = normalizePhoneNumber(rawPhoneNumber)
+  const phone = normalizePhoneNumber(rawPhoneNumber)
 
   try {
-    await (auth as any).sendPhoneCode(phoneNumber)
-    return phoneNumber
+    const verification = await auth!.getVerification({
+      phone_number: phone.cloudPhone,
+      target: 'ANY'
+    })
+
+    if (!verification?.verification_id) {
+      throw new Error('Failed to send verification code. Please try again.')
+    }
+
+    setSmsVerification(phone.e164, {
+      verificationId: verification.verification_id,
+      isUser: Boolean(verification.is_user),
+      createdAt: Date.now()
+    })
+
+    return phone.e164
   } catch (error) {
-    throwFriendlyError(error)
+    throwFriendlyError(error, 'Failed to send verification code. Please try again.')
   }
 }
 
 export async function registerBySms(rawPhoneNumber: string, phoneCode: string, password: string): Promise<AuthIdentity> {
   assertAuthReady()
-  const phoneNumber = normalizePhoneNumber(rawPhoneNumber)
+  const phone = normalizePhoneNumber(rawPhoneNumber)
   const code = phoneCode.trim()
   const safePassword = password.trim()
 
   if (!/^\d{4,8}$/.test(code)) {
-    throw new Error('请输入正确的短信验证码')
+    throw new Error('Please enter a valid SMS verification code')
   }
   if (!/^(?=.*[A-Za-z])(?=.*\d).{8,32}$/.test(safePassword)) {
-    throw new Error('密码需为 8-32 位，且包含字母和数字')
+    throw new Error('Password must be 8-32 chars and include letters and numbers')
+  }
+
+  const verification = getSmsVerification(phone.e164)
+  if (!verification) {
+    throw new Error('Please request an SMS code first')
+  }
+  if (verification.isUser) {
+    throw new Error('This phone number is already registered. Please sign in instead.')
   }
 
   try {
-    await (auth as any).signUpWithPhoneCode(phoneNumber, code, safePassword)
-    const loginState = await auth!.getLoginState()
-    const identity = parseIdentityFromState(loginState)
-    if (!identity) {
-      throw new Error('注册成功，但登录态获取失败，请重新登录')
+    const verifyRes = await auth!.verify({
+      verification_id: verification.verificationId,
+      verification_code: code
+    })
+
+    if (!verifyRes?.verification_token) {
+      throw new Error('SMS code verification failed. Please request a new code.')
     }
-    rememberPhoneAuth(identity)
-    return identity
+
+    const signUpRes = await (auth as any).signUp({
+      phone_number: phone.cloudPhone,
+      password: safePassword,
+      verification_token: verifyRes.verification_token,
+      verification_code: code
+    })
+
+    requireResultOk(signUpRes, 'Registration failed. Please try again.')
+
+    const identity = await getPhoneAuthIdentity()
+    if (identity && !identity.isAnonymous) {
+      clearSmsVerification(phone.e164)
+      return identity
+    }
+
+    const passwordLoginRes = await auth!.signInWithPassword({
+      phone: phone.cloudPhone,
+      password: safePassword
+    })
+    requireResultOk(passwordLoginRes, 'Registered but auto sign-in failed. Please sign in with password.')
+
+    const fallbackIdentity = await getPhoneAuthIdentity()
+    if (!fallbackIdentity) {
+      throw new Error('Registered but failed to load login state. Please sign in again.')
+    }
+
+    clearSmsVerification(phone.e164)
+    return fallbackIdentity
   } catch (error) {
-    throwFriendlyError(error)
+    throwFriendlyError(error, 'Registration failed. Please try again.')
   }
 }
 
 export async function loginBySmsOrPassword(input: SmsLoginInput): Promise<AuthIdentity> {
   assertAuthReady()
 
-  const phoneNumber = normalizePhoneNumber(input.phoneNumber)
+  const phone = normalizePhoneNumber(input.phoneNumber)
   const phoneCode = input.phoneCode?.trim()
   const password = input.password?.trim()
 
   if (!phoneCode && !password) {
-    throw new Error('请填写短信验证码或密码')
+    throw new Error('Please enter SMS code or password')
   }
 
   try {
-    const loginState = await (auth as any).signInWithPhoneCodeOrPassword({
-      phoneNumber,
-      phoneCode: phoneCode || undefined,
-      password: password || undefined
-    })
-    const identity = parseIdentityFromState(loginState)
-    if (!identity) {
-      throw new Error('登录成功，但用户信息解析失败')
+    if (password) {
+      const passwordLoginRes = await auth!.signInWithPassword({
+        phone: phone.cloudPhone,
+        password
+      })
+      requireResultOk(passwordLoginRes, 'Sign-in failed. Please try again.')
+    } else {
+      const verification = getSmsVerification(phone.e164)
+      if (!verification) {
+        throw new Error('Please request an SMS code first')
+      }
+      if (!verification.isUser) {
+        throw new Error('This phone number is not registered yet. Please register first.')
+      }
+
+      const smsLoginRes = await auth!.verifyOtp({
+        type: 'sms',
+        phone: phone.cloudPhone,
+        token: phoneCode,
+        messageId: verification.verificationId
+      })
+      requireResultOk(smsLoginRes, 'Sign-in failed. Please try again.')
+      clearSmsVerification(phone.e164)
     }
-    rememberPhoneAuth(identity)
+
+    const identity = await getPhoneAuthIdentity()
+    if (!identity) {
+      throw new Error('Signed in, but failed to load account identity.')
+    }
     return identity
   } catch (error) {
-    throwFriendlyError(error)
+    throwFriendlyError(error, 'Sign-in failed. Please try again.')
   }
 }
 
 export async function signOutPhoneAuth(): Promise<void> {
   assertAuthReady()
   try {
-    await (auth as any).signOut()
+    await auth!.signOut()
   } finally {
     rememberPhoneAuth(null)
   }
