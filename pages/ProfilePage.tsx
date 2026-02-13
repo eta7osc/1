@@ -1,6 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Camera, ImagePlus, LogOut, Save, UserCircle2 } from 'lucide-react'
 import { AccountProfile, updateAccountAvatar, updateAccountCover, updateAccountUsername } from '../services/accountService'
+import {
+  disablePushNotifications,
+  enablePushNotifications,
+  getPushSubscriptionStatus,
+  PushSubscriptionStatus
+} from '../services/notificationService'
 import {
   getAppLockPasscode,
   MIN_SECURITY_PASSCODE_LENGTH,
@@ -30,6 +36,13 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ account, appLockEnabled, onAp
   const [newPasscode, setNewPasscode] = useState('')
   const [confirmPasscode, setConfirmPasscode] = useState('')
 
+  const [pushSupported, setPushSupported] = useState(false)
+  const [pushPermission, setPushPermission] = useState<'unsupported' | NotificationPermission>('unsupported')
+  const [pushSubscribed, setPushSubscribed] = useState(false)
+  const [pushReason, setPushReason] = useState('')
+  const [pushLoading, setPushLoading] = useState(true)
+  const [pushSaving, setPushSaving] = useState(false)
+
   const avatarInputRef = useRef<HTMLInputElement | null>(null)
   const coverInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -40,6 +53,75 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ account, appLockEnabled, onAp
   useEffect(() => {
     setAppLockSwitch(appLockEnabled)
   }, [appLockEnabled])
+
+  const applyPushStatus = (status: PushSubscriptionStatus) => {
+    setPushSupported(status.supported)
+    setPushPermission(status.permission)
+    setPushSubscribed(status.subscribed)
+    setPushReason(status.reason || '')
+  }
+
+  const refreshPushStatus = async () => {
+    const status = await getPushSubscriptionStatus()
+    applyPushStatus(status)
+  }
+
+  useEffect(() => {
+    let active = true
+
+    const bootstrapPushStatus = async () => {
+      try {
+        setPushLoading(true)
+        const status = await getPushSubscriptionStatus()
+        if (!active) {
+          return
+        }
+        applyPushStatus(status)
+      } catch (err) {
+        if (!active) {
+          return
+        }
+        setPushSupported(false)
+        setPushPermission('unsupported')
+        setPushSubscribed(false)
+        setPushReason(err instanceof Error ? err.message : '推送状态检查失败')
+      } finally {
+        if (active) {
+          setPushLoading(false)
+        }
+      }
+    }
+
+    void bootstrapPushStatus()
+
+    return () => {
+      active = false
+    }
+  }, [account.uid])
+
+  const pushStatusLabel = useMemo(() => {
+    if (pushLoading) {
+      return '检测中...'
+    }
+
+    if (!pushSupported) {
+      return '当前设备/浏览器不支持'
+    }
+
+    if (pushSubscribed) {
+      return '已开启推送'
+    }
+
+    if (pushPermission === 'denied') {
+      return '系统已拒绝通知权限'
+    }
+
+    if (pushPermission === 'granted') {
+      return '已授权，尚未订阅'
+    }
+
+    return '未授权'
+  }, [pushLoading, pushPermission, pushSubscribed, pushSupported])
 
   const shortUid = useMemo(() => {
     if (!account.uid) {
@@ -187,6 +269,37 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ account, appLockEnabled, onAp
     }
   }
 
+  const handleEnablePush = async () => {
+    try {
+      setPushSaving(true)
+      setError('')
+      setHint('')
+      const status = await enablePushNotifications(account.role)
+      applyPushStatus(status)
+      setHint('消息推送已开启')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '开启推送失败，请重试')
+    } finally {
+      setPushSaving(false)
+    }
+  }
+
+  const handleDisablePush = async () => {
+    try {
+      setPushSaving(true)
+      setError('')
+      setHint('')
+      const status = await disablePushNotifications()
+      applyPushStatus(status)
+      setHint('消息推送已关闭')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '关闭推送失败，请重试')
+      await refreshPushStatus().catch(() => {})
+    } finally {
+      setPushSaving(false)
+    }
+  }
+
   const handleSignOut = async () => {
     try {
       setSigningOut(true)
@@ -229,7 +342,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ account, appLockEnabled, onAp
               disabled={uploadingAvatar}
               onClick={() => avatarInputRef.current?.click()}
             >
-              <Camera size={13} /> {uploadingAvatar ? '上传中' : '头像'}
+              <Camera size={13} /> {uploadingAvatar ? '上传中...' : '头像'}
             </button>
           </div>
 
@@ -237,7 +350,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ account, appLockEnabled, onAp
             <h2 className="ios-title text-2xl truncate">{account.username}</h2>
             <p className="text-xs text-gray-500 mt-1">UID: {shortUid}</p>
             <div className="mt-2 inline-flex items-center gap-2 text-[11px] text-rose-500 font-semibold bg-rose-50 rounded-full px-3 py-1">
-              社交主页
+              个人主页
             </div>
           </div>
         </div>
@@ -258,7 +371,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ account, appLockEnabled, onAp
           />
           <button type="button" onClick={handleSaveUsername} disabled={savingName} className="ios-button-primary px-3 py-2 text-sm shrink-0 disabled:opacity-60">
             <span className="inline-flex items-center gap-1">
-              <Save size={14} /> {savingName ? '保存中' : '保存'}
+              <Save size={14} /> {savingName ? '保存中...' : '保存'}
             </span>
           </button>
         </div>
@@ -279,6 +392,36 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ account, appLockEnabled, onAp
             <p className="profile-stat-label">身份</p>
             <p className="profile-stat-value">{account.role === 'me' ? '我' : '她'}</p>
           </div>
+        </div>
+      </section>
+
+      <section className="ios-card p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-gray-700">消息通知</h3>
+        <div className="rounded-2xl border border-rose-100 bg-rose-50/60 p-3 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-gray-700">推送状态</p>
+              <p className="text-xs text-gray-500 mt-1 break-all">{pushStatusLabel}</p>
+            </div>
+            <button
+              type="button"
+              className={`ios-pill px-3 py-1.5 text-xs ${pushSubscribed ? 'text-rose-500 border-rose-300 bg-rose-100' : ''}`}
+              disabled={pushLoading || pushSaving || !pushSupported}
+              onClick={pushSubscribed ? handleDisablePush : handleEnablePush}
+            >
+              {pushSaving ? '处理中...' : pushSubscribed ? '关闭推送' : '开启推送'}
+            </button>
+          </div>
+
+          <p className="text-xs text-gray-500 leading-5">
+            iOS 需先添加到主屏幕后再从主屏幕打开应用，首次开启会弹出系统通知授权。
+          </p>
+
+          {pushPermission === 'denied' && (
+            <p className="text-xs text-rose-500">通知权限已被拒绝，请到系统设置中重新开启通知权限。</p>
+          )}
+
+          {!!pushReason && !pushSupported && <p className="text-xs text-rose-500">{pushReason}</p>}
         </div>
       </section>
 

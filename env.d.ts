@@ -5,6 +5,8 @@ interface ImportMetaEnv {
   readonly VITE_PUBLIC_BASE?: string
   readonly VITE_PRIVATE_WALL_PASSWORD?: string
   readonly VITE_MAX_CHAT_FILE_MB?: string
+  readonly VITE_WEB_PUSH_VAPID_PUBLIC_KEY?: string
+  readonly VITE_PUSH_NOTIFY_FUNCTION_NAME?: string
 }
 
 interface ImportMeta {

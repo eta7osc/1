@@ -1,4 +1,5 @@
 ﻿import { app, ensureLogin, getStorage } from './cloudbaseClient'
+import { notifyPeerNewMessage } from './pushNotifyService'
 
 export type MsgType = 'text' | 'image' | 'video' | 'emoji' | 'audio'
 export type Sender = 'me' | 'her'
@@ -32,6 +33,7 @@ export interface EmojiPackItem {
 export interface SendMediaOptions {
   privateMedia?: boolean
   selfDestructSeconds?: number
+  senderLabel?: string
 }
 
 const ROOM_ID = 'couple-room'
@@ -153,6 +155,33 @@ function createSelfReadPayload(senderId: Sender) {
     : { readByMeAt: null as Date | null, readByHerAt: now }
 }
 
+function truncatePushPreview(content: string, limit = 60) {
+  const normalized = content.trim()
+  if (!normalized) {
+    return ''
+  }
+
+  return normalized.length > limit ? `${normalized.slice(0, limit)}...` : normalized
+}
+
+function notifyPeer(options: {
+  senderId: Sender
+  senderLabel?: string
+  messageType: MsgType
+  preview?: string
+  privateMedia?: boolean
+}) {
+  void notifyPeerNewMessage({
+    senderId: options.senderId,
+    senderLabel: options.senderLabel,
+    messageType: options.messageType,
+    preview: options.preview,
+    privateMedia: options.privateMedia
+  }).catch(error => {
+    console.warn('[Push] notify peer failed', error)
+  })
+}
+
 async function uploadMediaFile(file: File, folder: string) {
   const storage = getStorage()
   const ext = file.name.split('.').pop() || 'bin'
@@ -198,7 +227,7 @@ export async function fetchMessages(limit = 500): Promise<Message[]> {
   }))
 }
 
-export async function sendTextMessage(senderId: Sender, content: string) {
+export async function sendTextMessage(senderId: Sender, content: string, senderLabel?: string) {
   const text = content.trim()
   if (!text) {
     return
@@ -214,6 +243,13 @@ export async function sendTextMessage(senderId: Sender, content: string) {
     content: text,
     ...createSelfReadPayload(senderId),
     createdAt: new Date()
+  })
+
+  notifyPeer({
+    senderId,
+    senderLabel,
+    messageType: 'text',
+    preview: truncatePushPreview(text)
   })
 }
 
@@ -239,6 +275,22 @@ export async function sendFileMessage(senderId: Sender, file: File, options: Sen
     viewedAt: null,
     destructAt: null,
     createdAt: new Date()
+  })
+
+  const preview = privateMedia
+    ? '发来一条私密媒体消息'
+    : type === 'image'
+      ? '发来一张图片'
+      : type === 'video'
+        ? '发来一段视频'
+        : '发来一条语音消息'
+
+  notifyPeer({
+    senderId,
+    senderLabel: options.senderLabel,
+    messageType: type,
+    preview,
+    privateMedia
   })
 }
 
@@ -330,7 +382,7 @@ export async function uploadEmojiPack(senderId: Sender, file: File) {
   })
 }
 
-export async function sendEmojiMessage(senderId: Sender, fileId: string) {
+export async function sendEmojiMessage(senderId: Sender, fileId: string, senderLabel?: string) {
   await ensureLogin()
   if (!fileId) {
     throw new Error('表情包文件不存在')
@@ -345,4 +397,12 @@ export async function sendEmojiMessage(senderId: Sender, fileId: string) {
     ...createSelfReadPayload(senderId),
     createdAt: new Date()
   })
+
+  notifyPeer({
+    senderId,
+    senderLabel,
+    messageType: 'emoji',
+    preview: '发来一个表情包'
+  })
 }
+

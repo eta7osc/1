@@ -1,0 +1,9 @@
+﻿{
+  "name": "send-web-push-notification",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "@cloudbase/node-sdk": "^2.16.0",
+    "web-push": "^3.6.7"
+  }
+}

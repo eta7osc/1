@@ -229,7 +229,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
     setMessages(prev => [...prev, tempMsg])
 
     try {
-      await sendTextMessage(currentSender, text)
+      await sendTextMessage(currentSender, text, currentUserLabel)
       await loadMessages(false)
     } catch (err) {
       console.error('[Chat] send text failed', err)
@@ -239,7 +239,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
     } finally {
       setSending(false)
     }
-  }, [currentSender, input, isRecording, loadMessages, sending])
+  }, [currentSender, currentUserLabel, input, isRecording, loadMessages, sending])
 
   const handleSendMedia = useCallback(
     async (file: File) => {
@@ -266,7 +266,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
       try {
         await sendFileMessage(currentSender, file, {
           privateMedia: privateMode,
-          selfDestructSeconds: privateMode ? destructSeconds : undefined
+          selfDestructSeconds: privateMode ? destructSeconds : undefined,
+          senderLabel: currentUserLabel
         })
         await loadMessages(false)
       } catch (err) {
@@ -277,7 +278,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
         setSending(false)
       }
     },
-    [currentSender, destructSeconds, loadMessages, privateMode]
+    [currentSender, currentUserLabel, destructSeconds, loadMessages, privateMode]
   )
 
   const handleSendAudio = useCallback(
@@ -304,7 +305,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
       setMessages(prev => [...prev, tempMsg])
 
       try {
-        await sendFileMessage(currentSender, file)
+        await sendFileMessage(currentSender, file, {
+          senderLabel: currentUserLabel
+        })
         await loadMessages(false)
       } catch (err) {
         console.error('[Chat] send audio failed', err)
@@ -314,7 +317,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
         setSending(false)
       }
     },
-    [currentSender, loadMessages]
+    [currentSender, currentUserLabel, loadMessages]
   )
 
   const handleStopRecording = useCallback(() => {
@@ -428,7 +431,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentSender, currentUserLabel, cu
   const handleSendEmoji = async (fileId: string) => {
     try {
       setSending(true)
-      await sendEmojiMessage(currentSender, fileId)
+      await sendEmojiMessage(currentSender, fileId, currentUserLabel)
       await loadMessages(false)
       setShowEmojiPanel(false)
     } catch (err) {

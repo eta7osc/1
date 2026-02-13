@@ -5,6 +5,7 @@ import PasscodeLock from './components/PasscodeLock'
 import AuthGateway from './components/AuthGateway'
 import { AccountProfile, CoupleAvatarMap, ensureAccountProfile, getCoupleAvatarMap } from './services/accountService'
 import { isPhoneAuthenticated, signOutPhoneAuth } from './services/authService'
+import { clearPushSubscriptionBinding, syncExistingPushSubscription } from './services/notificationService'
 import { getAppLockEnabled } from './services/securityService'
 
 const ChatPage = lazy(() => import('./pages/ChatPage'))
@@ -138,6 +139,16 @@ const AppContent: React.FC = () => {
     }
   }, [accountRetrySeed, isLocked, phoneAuthed])
 
+  useEffect(() => {
+    if (!account || isLocked || !phoneAuthed) {
+      return
+    }
+
+    syncExistingPushSubscription(account.role).catch(error => {
+      console.warn('[Push] sync subscription failed', error)
+    })
+  }, [account, isLocked, phoneAuthed])
+
   if (authLoading) {
     return <LoadingState label="登录状态检查中..." />
   }
@@ -167,6 +178,7 @@ const AppContent: React.FC = () => {
             type="button"
             className="ios-button-secondary w-full py-3"
             onClick={async () => {
+              await clearPushSubscriptionBinding().catch(() => {})
               await signOutPhoneAuth()
               setPhoneAuthed(false)
               setAccount(null)
@@ -235,6 +247,7 @@ const AppContent: React.FC = () => {
                         })
                       }}
                       onSignOut={async () => {
+                        await clearPushSubscriptionBinding().catch(() => {})
                         await signOutPhoneAuth()
                         setPhoneAuthed(false)
                         setAccount(null)

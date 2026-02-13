@@ -15,19 +15,12 @@ ReactDOM.createRoot(rootElement).render(
 )
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(registrations => {
-    registrations.forEach(registration => {
-      registration.unregister().catch(() => {})
-    })
-  })
-}
+  window.addEventListener('load', () => {
+    const rawBase = (import.meta.env.BASE_URL || '/').trim()
+    const scope = rawBase.endsWith('/') ? rawBase : `${rawBase}/`
 
-if ('caches' in window) {
-  caches.keys().then(keys => {
-    keys
-      .filter(key => key.startsWith('lovers-secret-'))
-      .forEach(key => {
-        caches.delete(key).catch(() => {})
-      })
+    navigator.serviceWorker.register(`${scope}sw.js`, { scope }).catch(err => {
+      console.warn('[SW] register failed', err)
+    })
   })
 }

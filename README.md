@@ -34,6 +34,8 @@ cp .env.example .env.local
 VITE_CLOUDBASE_ENV_ID=你的云开发环境ID
 VITE_PRIVATE_WALL_PASSWORD=私密墙密码
 # VITE_MAX_CHAT_FILE_MB=300
+# VITE_WEB_PUSH_VAPID_PUBLIC_KEY=你的VAPID公钥
+# VITE_PUSH_NOTIFY_FUNCTION_NAME=sendWebPushNotification
 # VITE_PUBLIC_BASE=/
 ```
 
@@ -59,12 +61,41 @@ npm run build
 - `anniversaries`
 - `wall_items`
 - `couple_accounts`
+- `push_subscriptions`
 
 另外请确认：
 
 - 已开启匿名登录
 - 存储上传权限允许前端写入
 - 静态托管路径与 `VITE_PUBLIC_BASE` 一致（若子路径部署）
+
+## iOS 推送配置（Web Push）
+
+1. 生成 VAPID 密钥
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+2. 前端配置
+
+- 将 `publicKey` 写入 `.env.local` 的 `VITE_WEB_PUSH_VAPID_PUBLIC_KEY`
+- 保持 `VITE_PUSH_NOTIFY_FUNCTION_NAME=sendWebPushNotification`（如你改了函数名，前后端要一致）
+
+3. 部署云函数
+
+- 目录：`cloudfunctions/sendWebPushNotification`
+- 安装依赖后部署此函数
+- 在云函数环境变量中设置：
+  - `WEB_PUSH_VAPID_PUBLIC_KEY`
+  - `WEB_PUSH_VAPID_PRIVATE_KEY`
+  - `WEB_PUSH_SUBJECT`（例如 `mailto:you@example.com`）
+
+4. iOS 端使用要求
+
+- 必须 HTTPS
+- 必须“添加到主屏幕”后，从主屏幕图标启动
+- 在个人页 -> 消息通知 中开启推送授权
 
 ## 腾讯云部署（最短路径）
 
